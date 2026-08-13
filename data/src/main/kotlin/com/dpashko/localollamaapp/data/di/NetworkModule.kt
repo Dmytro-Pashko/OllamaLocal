@@ -41,8 +41,8 @@ object NetworkModule {
             }
             install(HttpTimeout) {
                 connectTimeoutMillis = 10_000
-                requestTimeoutMillis = 120_000
-                socketTimeoutMillis = 120_000
+                requestTimeoutMillis = 600_000
+                socketTimeoutMillis = 600_000
             }
             install(Logging) {
                 logger = object : Logger {
