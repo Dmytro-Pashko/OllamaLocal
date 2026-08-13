@@ -8,6 +8,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.dpashko.localollamaapp.presentation.chat.ChatRoute
 import com.dpashko.localollamaapp.presentation.conversationlist.ConversationListRoute
 import com.dpashko.localollamaapp.presentation.connection.ConnectionRoute
 
@@ -49,6 +50,21 @@ fun LocalOllamaAppRoot() {
                         ),
                     )
                 },
+            )
+        }
+
+        composable(
+            route = Routes.Conversation,
+            arguments = listOf(
+                navArgument(Routes.ArgHost) { type = NavType.StringType },
+                navArgument(Routes.ArgPort) { type = NavType.IntType },
+                navArgument(Routes.ArgModelName) { type = NavType.StringType },
+                navArgument(Routes.ArgConversationId) { type = NavType.LongType },
+            ),
+        ) {
+            ChatRoute(
+                viewModel = hiltViewModel(),
+                onBack = navController::popBackStack,
             )
         }
     }
