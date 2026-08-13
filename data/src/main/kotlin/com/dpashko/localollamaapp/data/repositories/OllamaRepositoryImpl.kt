@@ -98,14 +98,14 @@ class OllamaRepositoryImpl @Inject constructor(
 
             logger.info("Ollama sendChatMessage response status={}", response.status)
             if (response.status.isSuccess()) {
-                val chatResponse = response.body<OllamaChatResponseDto>()
+                val rawBody = response.bodyAsText()
+                val assistantContent = rawBody.decodeChatContent()
                 logger.info(
-                    "Ollama sendChatMessage parsed done={} doneReason={} responseChars={}",
-                    chatResponse.done,
-                    chatResponse.doneReason,
-                    chatResponse.message?.content?.length ?: 0,
+                    "Ollama sendChatMessage parsed responseChars={} rawBodyChars={}",
+                    assistantContent.length,
+                    rawBody.length,
                 )
-                AppResult.Success(chatResponse.message?.content.orEmpty())
+                AppResult.Success(assistantContent)
             } else {
                 AppResult.Failure(response.toAppError(operation = "sendChatMessage"))
             }
@@ -167,6 +167,21 @@ class OllamaRepositoryImpl @Inject constructor(
         } catch (exception: Exception) {
             null
         }
+
+    private fun String.decodeChatContent(): String {
+        val chunks = lineSequence()
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+            .toList()
+
+        if (chunks.isEmpty()) {
+            return ""
+        }
+
+        return chunks.joinToString(separator = "") { chunk ->
+            json.decodeFromString<OllamaChatResponseDto>(chunk).message?.content.orEmpty()
+        }
+    }
 
     private companion object {
         const val MAX_LOG_BODY_LENGTH = 4_000

@@ -27,6 +27,7 @@ object NetworkModule {
     fun provideJson(): Json =
         Json {
             ignoreUnknownKeys = true
+            encodeDefaults = true
             explicitNulls = false
         }
 
