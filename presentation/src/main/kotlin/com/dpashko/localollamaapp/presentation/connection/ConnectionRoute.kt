@@ -35,6 +35,7 @@ fun ConnectionRoute(
 
     ConnectionScreen(
         state = state,
+        onHostChanged = viewModel::onHostChanged,
         onPortChanged = viewModel::onPortChanged,
         onConnectClick = viewModel::connect,
         onModelSelected = viewModel::onModelSelected,
@@ -50,6 +51,7 @@ fun ConnectionRoute(
 @Composable
 private fun ConnectionScreen(
     state: ConnectionUiState,
+    onHostChanged: (String) -> Unit,
     onPortChanged: (String) -> Unit,
     onConnectClick: () -> Unit,
     onModelSelected: (String) -> Unit,
@@ -73,9 +75,8 @@ private fun ConnectionScreen(
             OutlinedTextField(
                 modifier = Modifier.fillMaxWidth(),
                 value = state.host,
-                onValueChange = {},
+                onValueChange = onHostChanged,
                 label = { Text("IP address") },
-                readOnly = true,
                 singleLine = true,
                 enabled = !state.isConnecting,
             )

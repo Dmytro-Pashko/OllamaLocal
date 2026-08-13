@@ -37,6 +37,18 @@ class ConnectionViewModel @Inject constructor(
         }
     }
 
+    fun onHostChanged(host: String) {
+        _uiState.update {
+            it.copy(
+                host = host,
+                isConnected = false,
+                models = emptyList(),
+                selectedModelName = null,
+                errorMessage = null,
+            )
+        }
+    }
+
     fun onModelSelected(modelName: String) {
         _uiState.update { it.copy(selectedModelName = modelName) }
     }
@@ -105,7 +117,7 @@ class ConnectionViewModel @Inject constructor(
         val state = _uiState.value
         val port = state.port.toIntOrNull() ?: return null
         return OllamaConnectionConfig(
-            host = OllamaConnectionConfig.DEFAULT_HOST,
+            host = state.host,
             port = port,
         )
     }
