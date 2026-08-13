@@ -75,12 +75,7 @@ class ConnectionViewModel @Inject constructor(
 
             when (val connectionResult = connectToOllamaUseCase(config)) {
                 is AppResult.Failure -> {
-                    _uiState.update {
-                        it.copy(
-                            isConnecting = false,
-                            errorMessage = connectionResult.error.toUserMessage(),
-                        )
-                    }
+                    handleConnectionFailure(config, connectionResult.error)
                 }
 
                 is AppResult.Success -> loadModels(config)
@@ -113,6 +108,38 @@ class ConnectionViewModel @Inject constructor(
         }
     }
 
+    private suspend fun handleConnectionFailure(
+        config: OllamaConnectionConfig,
+        error: AppError,
+    ) {
+        if (error == AppError.NetworkUnavailable && config.host.isLoopbackHost()) {
+            val emulatorConfig = config.copy(host = ANDROID_EMULATOR_HOST)
+            when (val fallbackResult = connectToOllamaUseCase(emulatorConfig)) {
+                is AppResult.Failure -> {
+                    _uiState.update {
+                        it.copy(
+                            isConnecting = false,
+                            errorMessage = loopbackErrorMessage(),
+                        )
+                    }
+                }
+
+                is AppResult.Success -> {
+                    _uiState.update { it.copy(host = emulatorConfig.host) }
+                    loadModels(emulatorConfig)
+                }
+            }
+            return
+        }
+
+        _uiState.update {
+            it.copy(
+                isConnecting = false,
+                errorMessage = error.toUserMessage(),
+            )
+        }
+    }
+
     private fun buildConfigOrNull(): OllamaConnectionConfig? {
         val state = _uiState.value
         val port = state.port.toIntOrNull() ?: return null
@@ -120,5 +147,17 @@ class ConnectionViewModel @Inject constructor(
             host = state.host,
             port = port,
         )
+    }
+
+    private fun String.isLoopbackHost(): Boolean =
+        equals("127.0.0.1", ignoreCase = true) ||
+            equals("localhost", ignoreCase = true) ||
+            equals("::1", ignoreCase = true)
+
+    private fun loopbackErrorMessage(): String =
+        "127.0.0.1 points to this Android device. Use 10.0.2.2 on Android Emulator, or your computer LAN IP on a real device."
+
+    private companion object {
+        const val ANDROID_EMULATOR_HOST = "10.0.2.2"
     }
 }

@@ -77,6 +77,9 @@ private fun ConnectionScreen(
                 value = state.host,
                 onValueChange = onHostChanged,
                 label = { Text("IP address") },
+                supportingText = {
+                    Text("Emulator host: 10.0.2.2. Real device: computer LAN IP.")
+                },
                 singleLine = true,
                 enabled = !state.isConnecting,
             )
