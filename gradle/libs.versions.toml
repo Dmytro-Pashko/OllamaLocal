@@ -14,9 +14,11 @@ ktor = "3.3.1"
 kotlin = "2.2.10"
 ksp = "2.2.10-2.0.2"
 lifecycle = "2.11.0"
+logbackAndroid = "3.0.0"
 navigationCompose = "2.9.6"
 room = "2.8.4"
 serializationJson = "1.9.0"
+slf4j = "2.0.7"
 composeBom = "2026.02.01"
 
 [libraries]
@@ -52,6 +54,8 @@ ktor-serialization-kotlinx-json = { group = "io.ktor", name = "ktor-serializatio
 kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }
 kotlinx-coroutines-core = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-core", version.ref = "coroutines" }
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "serializationJson" }
+logback-android = { group = "com.github.tony19", name = "logback-android", version.ref = "logbackAndroid" }
+slf4j-api = { group = "org.slf4j", name = "slf4j-api", version.ref = "slf4j" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

@@ -50,6 +50,8 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.hilt.android)
     implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.logback.android)
+    implementation(libs.slf4j.api)
     ksp(libs.hilt.compiler)
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))

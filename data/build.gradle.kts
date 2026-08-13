@@ -35,6 +35,7 @@ dependencies {
     implementation(libs.ktor.serialization.kotlinx.json)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.serialization.json)
+    implementation(libs.slf4j.api)
     ksp(libs.androidx.room.compiler)
     ksp(libs.hilt.compiler)
 }
