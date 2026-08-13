@@ -24,4 +24,7 @@ dependencyResolutionManagement {
 
 rootProject.name = "LocalOllamaApp"
 include(":app")
+include(":data")
+include(":domain")
+include(":presentation")
  
