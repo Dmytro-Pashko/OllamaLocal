@@ -8,7 +8,7 @@ import org.slf4j.LoggerFactory
 import javax.inject.Inject
 
 @HiltAndroidApp
-class LocalOllamaApplication : Application(), Configuration.Provider {
+class LocalLlmApplication : Application(), Configuration.Provider {
     @Inject
     lateinit var workerFactory: HiltWorkerFactory
 
@@ -19,7 +19,7 @@ class LocalOllamaApplication : Application(), Configuration.Provider {
 
     override fun onCreate() {
         super.onCreate()
-        LoggerFactory.getLogger(LocalOllamaApplication::class.java)
-            .info("LocalOllamaApplication started")
+        LoggerFactory.getLogger(LocalLlmApplication::class.java)
+            .info("LocalLlmApplication started")
     }
 }

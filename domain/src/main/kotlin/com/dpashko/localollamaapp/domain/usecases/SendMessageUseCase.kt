@@ -1,7 +1,7 @@
 package com.dpashko.localollamaapp.domain.usecases
 
 import com.dpashko.localollamaapp.domain.models.common.AppResult
-import com.dpashko.localollamaapp.domain.models.connection.OllamaConnectionConfig
+import com.dpashko.localollamaapp.domain.models.connection.ConnectionConfig
 import com.dpashko.localollamaapp.domain.models.error.AppError
 import com.dpashko.localollamaapp.domain.repositories.ChatGenerationScheduler
 import com.dpashko.localollamaapp.domain.repositories.ConversationRepository
@@ -12,7 +12,7 @@ class SendMessageUseCase @Inject constructor(
     private val chatGenerationScheduler: ChatGenerationScheduler,
 ) {
     suspend operator fun invoke(
-        config: OllamaConnectionConfig,
+        config: ConnectionConfig,
         conversationId: Long,
         modelName: String,
         content: String,

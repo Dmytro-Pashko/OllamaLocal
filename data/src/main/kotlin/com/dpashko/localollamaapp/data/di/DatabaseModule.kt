@@ -2,7 +2,7 @@ package com.dpashko.localollamaapp.data.di
 
 import android.content.Context
 import androidx.room.Room
-import com.dpashko.localollamaapp.data.database.LocalOllamaDatabase
+import com.dpashko.localollamaapp.data.database.LocalLlmDatabase
 import com.dpashko.localollamaapp.data.database.dao.ConversationDao
 import dagger.Module
 import dagger.Provides
@@ -18,16 +18,16 @@ object DatabaseModule {
     @Singleton
     fun provideDatabase(
         @ApplicationContext context: Context,
-    ): LocalOllamaDatabase =
+    ): LocalLlmDatabase =
         Room.databaseBuilder(
             context = context,
-            klass = LocalOllamaDatabase::class.java,
+            klass = LocalLlmDatabase::class.java,
             name = "local_ollama.db",
         )
-            .addMigrations(LocalOllamaDatabase.MIGRATION_1_2)
+            .addMigrations(LocalLlmDatabase.MIGRATION_1_2)
             .build()
 
     @Provides
-    fun provideConversationDao(database: LocalOllamaDatabase): ConversationDao =
+    fun provideConversationDao(database: LocalLlmDatabase): ConversationDao =
         database.conversationDao()
 }

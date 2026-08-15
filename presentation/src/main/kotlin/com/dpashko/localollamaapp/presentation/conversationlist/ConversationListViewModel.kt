@@ -5,6 +5,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.dpashko.localollamaapp.domain.models.common.AppResult
+import com.dpashko.localollamaapp.domain.models.connection.AiProvider
 import com.dpashko.localollamaapp.domain.usecases.CreateConversationUseCase
 import com.dpashko.localollamaapp.domain.usecases.DeleteConversationUseCase
 import com.dpashko.localollamaapp.domain.usecases.ObserveConversationsUseCase
@@ -29,12 +30,14 @@ class ConversationListViewModel @Inject constructor(
     private val createConversationUseCase: CreateConversationUseCase,
     private val deleteConversationUseCase: DeleteConversationUseCase,
 ) : ViewModel() {
+    private val provider = AiProvider.fromRouteValue(savedStateHandle[Routes.ArgProvider])
     private val host = Uri.decode(savedStateHandle[Routes.ArgHost] ?: "")
-    private val port = savedStateHandle[Routes.ArgPort] ?: 11434
+    private val port = savedStateHandle[Routes.ArgPort] ?: provider.defaultPort
     private val selectedModelName = Uri.decode(savedStateHandle[Routes.ArgModelName] ?: "")
 
     private val _uiState = MutableStateFlow(
         ConversationListUiState(
+            provider = provider,
             host = host,
             port = port,
             selectedModelName = selectedModelName,
@@ -66,6 +69,7 @@ class ConversationListViewModel @Inject constructor(
                     _uiState.update { it.copy(errorMessage = null) }
                     _events.emit(
                         ConversationListEvent.OpenConversation(
+                            provider = provider,
                             host = host,
                             port = port,
                             modelName = selectedModelName,
@@ -94,6 +98,7 @@ class ConversationListViewModel @Inject constructor(
 
 sealed interface ConversationListEvent {
     data class OpenConversation(
+        val provider: AiProvider,
         val host: String,
         val port: Int,
         val modelName: String,

@@ -20,7 +20,7 @@ import org.slf4j.LoggerFactory
 @Module
 @InstallIn(SingletonComponent::class)
 object NetworkModule {
-    private val ktorLogger = LoggerFactory.getLogger("OllamaKtorClient")
+    private val ktorLogger = LoggerFactory.getLogger("AiProviderKtorClient")
 
     @Provides
     @Singleton

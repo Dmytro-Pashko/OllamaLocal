@@ -16,7 +16,7 @@ import com.dpashko.localollamaapp.data.models.local.MessageEntity
     version = 2,
     exportSchema = false,
 )
-abstract class LocalOllamaDatabase : RoomDatabase() {
+abstract class LocalLlmDatabase : RoomDatabase() {
     abstract fun conversationDao(): ConversationDao
 
     companion object {

@@ -31,13 +31,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.dpashko.localollamaapp.domain.models.connection.AiProvider
 import kotlinx.coroutines.flow.collectLatest
 
 @Composable
 fun ConversationListRoute(
     viewModel: ConversationListViewModel,
     onBack: () -> Unit,
-    onOpenConversation: (String, Int, String, Long) -> Unit,
+    onOpenConversation: (AiProvider, String, Int, String, Long) -> Unit,
 ) {
     val state by viewModel.uiState.collectAsState()
 
@@ -46,6 +47,7 @@ fun ConversationListRoute(
             when (event) {
                 is ConversationListEvent.OpenConversation -> {
                     onOpenConversation(
+                        event.provider,
                         event.host,
                         event.port,
                         event.modelName,
@@ -63,6 +65,7 @@ fun ConversationListRoute(
         onDeleteConversation = viewModel::deleteConversation,
         onOpenConversation = { conversation ->
             onOpenConversation(
+                state.provider,
                 state.host,
                 state.port,
                 conversation.modelName,

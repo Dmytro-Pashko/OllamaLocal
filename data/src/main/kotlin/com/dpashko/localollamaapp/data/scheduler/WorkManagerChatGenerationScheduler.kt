@@ -7,7 +7,7 @@ import androidx.work.WorkManager
 import androidx.work.workDataOf
 import com.dpashko.localollamaapp.data.workers.GenerateAssistantMessageWorker
 import com.dpashko.localollamaapp.domain.models.common.AppResult
-import com.dpashko.localollamaapp.domain.models.connection.OllamaConnectionConfig
+import com.dpashko.localollamaapp.domain.models.connection.ConnectionConfig
 import com.dpashko.localollamaapp.domain.models.error.AppError
 import com.dpashko.localollamaapp.domain.repositories.ChatGenerationScheduler
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -17,7 +17,7 @@ class WorkManagerChatGenerationScheduler @Inject constructor(
     @param:ApplicationContext private val context: Context,
 ) : ChatGenerationScheduler {
     override suspend fun enqueueGeneration(
-        config: OllamaConnectionConfig,
+        config: ConnectionConfig,
         conversationId: Long,
         assistantMessageId: Long,
         modelName: String,
@@ -26,6 +26,7 @@ class WorkManagerChatGenerationScheduler @Inject constructor(
             val request = OneTimeWorkRequestBuilder<GenerateAssistantMessageWorker>()
                 .setInputData(
                     workDataOf(
+                        GenerateAssistantMessageWorker.KEY_PROVIDER to config.provider.routeValue,
                         GenerateAssistantMessageWorker.KEY_HOST to config.host,
                         GenerateAssistantMessageWorker.KEY_PORT to config.port,
                         GenerateAssistantMessageWorker.KEY_CONVERSATION_ID to conversationId,

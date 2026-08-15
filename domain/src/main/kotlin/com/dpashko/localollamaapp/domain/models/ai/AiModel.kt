@@ -1,6 +1,6 @@
-package com.dpashko.localollamaapp.domain.models.ollama
+package com.dpashko.localollamaapp.domain.models.ai
 
-data class OllamaModel(
+data class AiModel(
     val name: String,
     val parameterSize: String?,
     val quantizationLevel: String?,

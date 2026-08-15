@@ -22,7 +22,7 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "LocalOllamaApp"
+rootProject.name = "LocalLlmApp"
 include(":app")
 include(":data")
 include(":domain")

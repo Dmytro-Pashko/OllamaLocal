@@ -5,7 +5,8 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.dpashko.localollamaapp.domain.models.common.AppResult
-import com.dpashko.localollamaapp.domain.models.connection.OllamaConnectionConfig
+import com.dpashko.localollamaapp.domain.models.connection.AiProvider
+import com.dpashko.localollamaapp.domain.models.connection.ConnectionConfig
 import com.dpashko.localollamaapp.domain.usecases.ObserveHasGeneratingMessageUseCase
 import com.dpashko.localollamaapp.domain.usecases.ObserveMessagesUseCase
 import com.dpashko.localollamaapp.domain.usecases.SendMessageUseCase
@@ -27,13 +28,15 @@ class ChatViewModel @Inject constructor(
     private val observeHasGeneratingMessageUseCase: ObserveHasGeneratingMessageUseCase,
     private val sendMessageUseCase: SendMessageUseCase,
 ) : ViewModel() {
+    private val provider = AiProvider.fromRouteValue(savedStateHandle[Routes.ArgProvider])
     private val host = Uri.decode(savedStateHandle[Routes.ArgHost] ?: "")
-    private val port = savedStateHandle[Routes.ArgPort] ?: 11434
+    private val port = savedStateHandle[Routes.ArgPort] ?: provider.defaultPort
     private val modelName = Uri.decode(savedStateHandle[Routes.ArgModelName] ?: "")
     private val conversationId = savedStateHandle[Routes.ArgConversationId] ?: 0L
 
     private val _uiState = MutableStateFlow(
         ChatUiState(
+            provider = provider,
             host = host,
             port = port,
             modelName = modelName,
@@ -85,7 +88,8 @@ class ChatViewModel @Inject constructor(
             }
 
             val result = sendMessageUseCase(
-                config = OllamaConnectionConfig(
+                config = ConnectionConfig(
+                    provider = provider,
                     host = host,
                     port = port,
                 ),

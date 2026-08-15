@@ -3,9 +3,10 @@ package com.dpashko.localollamaapp.presentation.connection
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.dpashko.localollamaapp.domain.models.common.AppResult
-import com.dpashko.localollamaapp.domain.models.connection.OllamaConnectionConfig
+import com.dpashko.localollamaapp.domain.models.connection.AiProvider
+import com.dpashko.localollamaapp.domain.models.connection.ConnectionConfig
 import com.dpashko.localollamaapp.domain.models.error.AppError
-import com.dpashko.localollamaapp.domain.usecases.ConnectToOllamaUseCase
+import com.dpashko.localollamaapp.domain.usecases.ConnectToProviderUseCase
 import com.dpashko.localollamaapp.domain.usecases.GetAvailableModelsUseCase
 import com.dpashko.localollamaapp.presentation.common.toUserMessage
 import com.dpashko.localollamaapp.presentation.ui.models.toUi
@@ -19,7 +20,7 @@ import javax.inject.Inject
 
 @HiltViewModel
 class ConnectionViewModel @Inject constructor(
-    private val connectToOllamaUseCase: ConnectToOllamaUseCase,
+    private val connectToProviderUseCase: ConnectToProviderUseCase,
     private val getAvailableModelsUseCase: GetAvailableModelsUseCase,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(ConnectionUiState())
@@ -29,6 +30,19 @@ class ConnectionViewModel @Inject constructor(
         _uiState.update {
             it.copy(
                 port = port.filter(Char::isDigit),
+                isConnected = false,
+                models = emptyList(),
+                selectedModelName = null,
+                errorMessage = null,
+            )
+        }
+    }
+
+    fun onProviderSelected(provider: AiProvider) {
+        _uiState.update {
+            it.copy(
+                provider = provider,
+                port = provider.defaultPort.toString(),
                 isConnected = false,
                 models = emptyList(),
                 selectedModelName = null,
@@ -73,7 +87,7 @@ class ConnectionViewModel @Inject constructor(
                 )
             }
 
-            when (val connectionResult = connectToOllamaUseCase(config)) {
+            when (val connectionResult = connectToProviderUseCase(config)) {
                 is AppResult.Failure -> {
                     _uiState.update {
                         it.copy(
@@ -88,7 +102,7 @@ class ConnectionViewModel @Inject constructor(
         }
     }
 
-    private suspend fun loadModels(config: OllamaConnectionConfig) {
+    private suspend fun loadModels(config: ConnectionConfig) {
         when (val modelsResult = getAvailableModelsUseCase(config)) {
             is AppResult.Failure -> {
                 _uiState.update {
@@ -113,10 +127,11 @@ class ConnectionViewModel @Inject constructor(
         }
     }
 
-    private fun buildConfigOrNull(): OllamaConnectionConfig? {
+    private fun buildConfigOrNull(): ConnectionConfig? {
         val state = _uiState.value
         val port = state.port.toIntOrNull() ?: return null
-        return OllamaConnectionConfig(
+        return ConnectionConfig(
+            provider = state.provider,
             host = state.host,
             port = port,
         )

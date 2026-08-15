@@ -25,16 +25,18 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.dpashko.localollamaapp.domain.models.connection.AiProvider
 
 @Composable
 fun ConnectionRoute(
     viewModel: ConnectionViewModel,
-    onOpenConversations: (String, Int, String) -> Unit,
+    onOpenConversations: (AiProvider, String, Int, String) -> Unit,
 ) {
     val state by viewModel.uiState.collectAsState()
 
     ConnectionScreen(
         state = state,
+        onProviderSelected = viewModel::onProviderSelected,
         onHostChanged = viewModel::onHostChanged,
         onPortChanged = viewModel::onPortChanged,
         onConnectClick = viewModel::connect,
@@ -42,7 +44,7 @@ fun ConnectionRoute(
         onOpenConversations = {
             val port = state.port.toIntOrNull() ?: return@ConnectionScreen
             val modelName = state.selectedModelName ?: return@ConnectionScreen
-            onOpenConversations(state.host, port, modelName)
+            onOpenConversations(state.provider, state.host, port, modelName)
         },
     )
 }
@@ -51,12 +53,14 @@ fun ConnectionRoute(
 @Composable
 private fun ConnectionScreen(
     state: ConnectionUiState,
+    onProviderSelected: (AiProvider) -> Unit,
     onHostChanged: (String) -> Unit,
     onPortChanged: (String) -> Unit,
     onConnectClick: () -> Unit,
     onModelSelected: (String) -> Unit,
     onOpenConversations: () -> Unit,
 ) {
+    var isProviderMenuExpanded by remember { mutableStateOf(false) }
     var isModelMenuExpanded by remember { mutableStateOf(false) }
 
     Scaffold { innerPadding ->
@@ -68,9 +72,47 @@ private fun ConnectionScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Text(
-                text = "Local Ollama",
+                text = "Local LLM",
                 style = MaterialTheme.typography.headlineMedium,
             )
+
+            ExposedDropdownMenuBox(
+                expanded = isProviderMenuExpanded,
+                onExpandedChange = {
+                    if (!state.isConnecting) {
+                        isProviderMenuExpanded = !isProviderMenuExpanded
+                    }
+                },
+            ) {
+                OutlinedTextField(
+                    modifier = Modifier
+                        .menuAnchor()
+                        .fillMaxWidth(),
+                    value = state.provider.displayName,
+                    onValueChange = {},
+                    readOnly = true,
+                    enabled = !state.isConnecting,
+                    label = { Text("Provider") },
+                    trailingIcon = {
+                        ExposedDropdownMenuDefaults.TrailingIcon(expanded = isProviderMenuExpanded)
+                    },
+                )
+
+                ExposedDropdownMenu(
+                    expanded = isProviderMenuExpanded,
+                    onDismissRequest = { isProviderMenuExpanded = false },
+                ) {
+                    AiProvider.entries.forEach { provider ->
+                        DropdownMenuItem(
+                            text = { Text(provider.displayName) },
+                            onClick = {
+                                onProviderSelected(provider)
+                                isProviderMenuExpanded = false
+                            },
+                        )
+                    }
+                }
+            }
 
             OutlinedTextField(
                 modifier = Modifier.fillMaxWidth(),
@@ -156,7 +198,7 @@ private fun ConnectionScreen(
                 onClick = onOpenConversations,
                 enabled = state.isConnected && state.selectedModelName != null,
             ) {
-                Text("To Conversation")
+                Text("To Conversations")
             }
 
             state.errorMessage?.let { error ->
