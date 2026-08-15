@@ -1,7 +1,9 @@
 package com.dpashko.localollamaapp.data.di
 
+import com.dpashko.localollamaapp.data.scheduler.WorkManagerChatGenerationScheduler
 import com.dpashko.localollamaapp.data.repositories.ConversationRepositoryImpl
 import com.dpashko.localollamaapp.data.repositories.OllamaRepositoryImpl
+import com.dpashko.localollamaapp.domain.repositories.ChatGenerationScheduler
 import com.dpashko.localollamaapp.domain.repositories.ConversationRepository
 import com.dpashko.localollamaapp.domain.repositories.OllamaRepository
 import dagger.Binds
@@ -24,4 +26,10 @@ abstract class RepositoryModule {
     abstract fun bindOllamaRepository(
         repository: OllamaRepositoryImpl,
     ): OllamaRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindChatGenerationScheduler(
+        scheduler: WorkManagerChatGenerationScheduler,
+    ): ChatGenerationScheduler
 }

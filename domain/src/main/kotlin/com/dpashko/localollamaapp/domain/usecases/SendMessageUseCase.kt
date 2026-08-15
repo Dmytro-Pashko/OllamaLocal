@@ -2,15 +2,14 @@ package com.dpashko.localollamaapp.domain.usecases
 
 import com.dpashko.localollamaapp.domain.models.common.AppResult
 import com.dpashko.localollamaapp.domain.models.connection.OllamaConnectionConfig
-import com.dpashko.localollamaapp.domain.models.conversation.MessageRole
 import com.dpashko.localollamaapp.domain.models.error.AppError
+import com.dpashko.localollamaapp.domain.repositories.ChatGenerationScheduler
 import com.dpashko.localollamaapp.domain.repositories.ConversationRepository
-import com.dpashko.localollamaapp.domain.repositories.OllamaRepository
 import javax.inject.Inject
 
 class SendMessageUseCase @Inject constructor(
     private val conversationRepository: ConversationRepository,
-    private val ollamaRepository: OllamaRepository,
+    private val chatGenerationScheduler: ChatGenerationScheduler,
 ) {
     suspend operator fun invoke(
         config: OllamaConnectionConfig,
@@ -23,40 +22,39 @@ class SendMessageUseCase @Inject constructor(
             return AppResult.Failure(AppError.EmptyMessage)
         }
 
-        val userMessageResult = conversationRepository.addMessage(
-            conversationId = conversationId,
-            role = MessageRole.USER,
-            content = trimmedContent,
-        )
-        if (userMessageResult is AppResult.Failure) {
-            return userMessageResult
-        }
-
-        val messages = when (val result = conversationRepository.getMessages(conversationId)) {
-            is AppResult.Failure -> return result
-            is AppResult.Success -> result.data
-        }
-
-        val assistantContent = when (
-            val result = ollamaRepository.sendChatMessage(
-                config = config,
-                modelName = modelName,
-                messages = messages,
+        when (
+            val userMessageResult = conversationRepository.addUserMessage(
+                conversationId = conversationId,
+                content = trimmedContent,
             )
         ) {
-            is AppResult.Failure -> return result
-            is AppResult.Success -> result.data
+            is AppResult.Failure -> return userMessageResult
+            is AppResult.Success -> Unit
+        }
+
+        val assistantMessageId = when (
+            val placeholderResult = conversationRepository.addAssistantPlaceholder(conversationId)
+        ) {
+            is AppResult.Failure -> return placeholderResult
+            is AppResult.Success -> placeholderResult.data
         }
 
         return when (
-            val result = conversationRepository.addMessage(
+            val scheduleResult = chatGenerationScheduler.enqueueGeneration(
+                config = config,
                 conversationId = conversationId,
-                role = MessageRole.ASSISTANT,
-                content = assistantContent,
+                assistantMessageId = assistantMessageId,
+                modelName = modelName,
             )
         ) {
-            is AppResult.Failure -> result
             is AppResult.Success -> AppResult.Success(Unit)
+            is AppResult.Failure -> {
+                conversationRepository.failAssistantMessage(
+                    messageId = assistantMessageId,
+                    errorMessage = scheduleResult.error.toString(),
+                )
+                scheduleResult
+            }
         }
     }
 }

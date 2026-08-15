@@ -5,5 +5,7 @@ data class Message(
     val conversationId: Long,
     val role: MessageRole,
     val content: String,
+    val status: MessageStatus,
+    val errorMessage: String?,
     val createdAtMillis: Long,
 )

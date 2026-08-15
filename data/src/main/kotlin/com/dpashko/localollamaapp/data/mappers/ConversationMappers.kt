@@ -20,5 +20,7 @@ fun MessageEntity.toDomain(): Message =
         conversationId = conversationId,
         role = role,
         content = content,
+        status = status,
+        errorMessage = errorMessage,
         createdAtMillis = createdAtMillis,
     )

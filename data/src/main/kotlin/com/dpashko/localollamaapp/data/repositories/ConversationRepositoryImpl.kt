@@ -8,6 +8,7 @@ import com.dpashko.localollamaapp.domain.models.common.AppResult
 import com.dpashko.localollamaapp.domain.models.conversation.Conversation
 import com.dpashko.localollamaapp.domain.models.conversation.Message
 import com.dpashko.localollamaapp.domain.models.conversation.MessageRole
+import com.dpashko.localollamaapp.domain.models.conversation.MessageStatus
 import com.dpashko.localollamaapp.domain.models.error.AppError
 import com.dpashko.localollamaapp.domain.repositories.ConversationRepository
 import kotlinx.coroutines.flow.Flow
@@ -25,9 +26,17 @@ class ConversationRepositoryImpl @Inject constructor(
         conversationDao.observeMessages(conversationId)
             .map { messages -> messages.map { it.toDomain() } }
 
-    override suspend fun getMessages(conversationId: Long): AppResult<List<Message>> =
+    override fun observeHasGeneratingMessage(conversationId: Long): Flow<Boolean> =
+        conversationDao.observeHasGeneratingMessage(conversationId)
+
+    override suspend fun getContextMessages(conversationId: Long): AppResult<List<Message>> =
         safeDatabaseCall {
-            conversationDao.getMessages(conversationId).map { it.toDomain() }
+            conversationDao.getContextMessages(conversationId).map { it.toDomain() }
+        }
+
+    override suspend fun messageExists(messageId: Long): AppResult<Boolean> =
+        safeDatabaseCall {
+            conversationDao.messageExists(messageId)
         }
 
     override suspend fun createConversation(modelName: String): AppResult<Long> =
@@ -48,9 +57,8 @@ class ConversationRepositoryImpl @Inject constructor(
             conversationDao.deleteConversation(conversationId)
         }
 
-    override suspend fun addMessage(
+    override suspend fun addUserMessage(
         conversationId: Long,
-        role: MessageRole,
         content: String,
     ): AppResult<Long> =
         safeDatabaseCall {
@@ -59,13 +67,15 @@ class ConversationRepositoryImpl @Inject constructor(
             val messageId = conversationDao.insertMessage(
                 MessageEntity(
                     conversationId = conversationId,
-                    role = role,
+                    role = MessageRole.USER,
                     content = content,
+                    status = MessageStatus.SENT,
+                    errorMessage = null,
                     createdAtMillis = now,
                 ),
             )
 
-            if (role == MessageRole.USER && messageCount == 0) {
+            if (messageCount == 0) {
                 conversationDao.updateConversationTitleAndTimestamp(
                     conversationId = conversationId,
                     title = content.toConversationTitle(),
@@ -81,12 +91,65 @@ class ConversationRepositoryImpl @Inject constructor(
             messageId
         }
 
+    override suspend fun addAssistantPlaceholder(conversationId: Long): AppResult<Long> =
+        safeDatabaseCall {
+            val now = System.currentTimeMillis()
+            val messageId = conversationDao.insertMessage(
+                MessageEntity(
+                    conversationId = conversationId,
+                    role = MessageRole.ASSISTANT,
+                    content = "",
+                    status = MessageStatus.GENERATING,
+                    errorMessage = null,
+                    createdAtMillis = now,
+                ),
+            )
+            conversationDao.updateConversationTimestamp(
+                conversationId = conversationId,
+                updatedAtMillis = now,
+            )
+            messageId
+        }
+
+    override suspend fun completeAssistantMessage(
+        messageId: Long,
+        content: String,
+    ): AppResult<Unit> =
+        safeDatabaseCall {
+            conversationDao.completeAssistantMessage(
+                messageId = messageId,
+                content = content,
+            )
+            updateConversationTimestampForMessage(messageId)
+        }
+
+    override suspend fun failAssistantMessage(
+        messageId: Long,
+        errorMessage: String,
+    ): AppResult<Unit> =
+        safeDatabaseCall {
+            conversationDao.failAssistantMessage(
+                messageId = messageId,
+                errorMessage = errorMessage,
+            )
+            updateConversationTimestampForMessage(messageId)
+        }
+
     private suspend fun <T> safeDatabaseCall(block: suspend () -> T): AppResult<T> =
         try {
             AppResult.Success(block())
         } catch (exception: Exception) {
             AppResult.Failure(AppError.Unknown(exception.message))
         }
+
+    private suspend fun updateConversationTimestampForMessage(messageId: Long) {
+        conversationDao.getConversationIdForMessage(messageId)?.let { conversationId ->
+            conversationDao.updateConversationTimestamp(
+                conversationId = conversationId,
+                updatedAtMillis = System.currentTimeMillis(),
+            )
+        }
+    }
 
     private fun String.toConversationTitle(): String =
         lineSequence()

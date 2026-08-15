@@ -23,7 +23,9 @@ object DatabaseModule {
             context = context,
             klass = LocalOllamaDatabase::class.java,
             name = "local_ollama.db",
-        ).build()
+        )
+            .addMigrations(LocalOllamaDatabase.MIGRATION_1_2)
+            .build()
 
     @Provides
     fun provideConversationDao(database: LocalOllamaDatabase): ConversationDao =

@@ -36,6 +36,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.dpashko.localollamaapp.domain.models.conversation.MessageRole
+import com.dpashko.localollamaapp.domain.models.conversation.MessageStatus
 import com.dpashko.localollamaapp.presentation.ui.models.MessageUi
 
 @Composable
@@ -95,6 +96,7 @@ private fun ChatScreen(
             MessageInputBar(
                 messageText = state.messageText,
                 isSending = state.isSending,
+                hasGeneratingMessage = state.hasGeneratingMessage,
                 onMessageChanged = onMessageChanged,
                 onSendClick = onSendClick,
             )
@@ -147,6 +149,11 @@ private fun ChatScreen(
 @Composable
 private fun MessageBubble(message: MessageUi) {
     val isUser = message.role == MessageRole.USER
+    val bubbleText = when (message.status) {
+        MessageStatus.GENERATING -> "Generating..."
+        MessageStatus.FAILED -> message.errorMessage ?: "Generation failed."
+        MessageStatus.SENT -> message.content
+    }
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start,
@@ -165,14 +172,24 @@ private fun MessageBubble(message: MessageUi) {
                 .padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            Text(
-                text = message.content,
-                color = if (isUser) {
-                    MaterialTheme.colorScheme.onPrimaryContainer
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                },
-            )
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (message.status == MessageStatus.GENERATING) {
+                    CircularProgressIndicator()
+                }
+                Text(
+                    text = bubbleText,
+                    color = if (message.status == MessageStatus.FAILED) {
+                        MaterialTheme.colorScheme.error
+                    } else if (isUser) {
+                        MaterialTheme.colorScheme.onPrimaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                )
+            }
             Text(
                 modifier = Modifier.align(Alignment.End),
                 text = message.createdAtText,
@@ -191,6 +208,7 @@ private fun MessageBubble(message: MessageUi) {
 private fun MessageInputBar(
     messageText: String,
     isSending: Boolean,
+    hasGeneratingMessage: Boolean,
     onMessageChanged: (String) -> Unit,
     onSendClick: () -> Unit,
 ) {
@@ -215,7 +233,7 @@ private fun MessageInputBar(
 
         Button(
             onClick = onSendClick,
-            enabled = !isSending && messageText.isNotBlank(),
+            enabled = !isSending && !hasGeneratingMessage && messageText.isNotBlank(),
         ) {
             if (isSending) {
                 CircularProgressIndicator()

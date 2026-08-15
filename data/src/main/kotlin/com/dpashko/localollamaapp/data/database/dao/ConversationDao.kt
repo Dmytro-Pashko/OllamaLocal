@@ -19,8 +19,37 @@ interface ConversationDao {
     @Query("SELECT * FROM messages WHERE conversationId = :conversationId ORDER BY createdAtMillis ASC, id ASC")
     suspend fun getMessages(conversationId: Long): List<MessageEntity>
 
+    @Query(
+        """
+        SELECT * FROM messages
+        WHERE conversationId = :conversationId
+            AND status = 'SENT'
+            AND content != ''
+        ORDER BY createdAtMillis ASC, id ASC
+        """,
+    )
+    suspend fun getContextMessages(conversationId: Long): List<MessageEntity>
+
     @Query("SELECT COUNT(*) FROM messages WHERE conversationId = :conversationId")
     suspend fun getMessageCount(conversationId: Long): Int
+
+    @Query(
+        """
+        SELECT EXISTS(
+            SELECT 1 FROM messages
+            WHERE conversationId = :conversationId
+                AND role = 'ASSISTANT'
+                AND status = 'GENERATING'
+        )
+        """,
+    )
+    fun observeHasGeneratingMessage(conversationId: Long): Flow<Boolean>
+
+    @Query("SELECT EXISTS(SELECT 1 FROM messages WHERE id = :messageId)")
+    suspend fun messageExists(messageId: Long): Boolean
+
+    @Query("SELECT conversationId FROM messages WHERE id = :messageId")
+    suspend fun getConversationIdForMessage(messageId: Long): Long?
 
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insertConversation(conversation: ConversationEntity): Long
@@ -39,6 +68,33 @@ interface ConversationDao {
     suspend fun updateConversationTimestamp(
         conversationId: Long,
         updatedAtMillis: Long,
+    )
+
+    @Query(
+        """
+        UPDATE messages
+        SET content = :content,
+            status = 'SENT',
+            errorMessage = NULL
+        WHERE id = :messageId
+        """,
+    )
+    suspend fun completeAssistantMessage(
+        messageId: Long,
+        content: String,
+    )
+
+    @Query(
+        """
+        UPDATE messages
+        SET status = 'FAILED',
+            errorMessage = :errorMessage
+        WHERE id = :messageId
+        """,
+    )
+    suspend fun failAssistantMessage(
+        messageId: Long,
+        errorMessage: String,
     )
 
     @Query("DELETE FROM conversations WHERE id = :conversationId")

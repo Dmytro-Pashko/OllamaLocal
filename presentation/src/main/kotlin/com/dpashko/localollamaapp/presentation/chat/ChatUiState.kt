@@ -10,5 +10,6 @@ data class ChatUiState(
     val messages: List<MessageUi> = emptyList(),
     val messageText: String = "",
     val isSending: Boolean = false,
+    val hasGeneratingMessage: Boolean = false,
     val errorMessage: String? = null,
 )

@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.dpashko.localollamaapp.domain.models.common.AppResult
 import com.dpashko.localollamaapp.domain.models.connection.OllamaConnectionConfig
+import com.dpashko.localollamaapp.domain.usecases.ObserveHasGeneratingMessageUseCase
 import com.dpashko.localollamaapp.domain.usecases.ObserveMessagesUseCase
 import com.dpashko.localollamaapp.domain.usecases.SendMessageUseCase
 import com.dpashko.localollamaapp.presentation.Routes
@@ -23,6 +24,7 @@ import javax.inject.Inject
 class ChatViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val observeMessagesUseCase: ObserveMessagesUseCase,
+    private val observeHasGeneratingMessageUseCase: ObserveHasGeneratingMessageUseCase,
     private val sendMessageUseCase: SendMessageUseCase,
 ) : ViewModel() {
     private val host = Uri.decode(savedStateHandle[Routes.ArgHost] ?: "")
@@ -48,6 +50,14 @@ class ChatViewModel @Inject constructor(
                 }
             }
         }
+
+        viewModelScope.launch {
+            observeHasGeneratingMessageUseCase(conversationId).collect { hasGeneratingMessage ->
+                _uiState.update {
+                    it.copy(hasGeneratingMessage = hasGeneratingMessage)
+                }
+            }
+        }
     }
 
     fun onMessageChanged(messageText: String) {
@@ -61,6 +71,9 @@ class ChatViewModel @Inject constructor(
 
     fun sendMessage() {
         val content = _uiState.value.messageText
+        if (content.isBlank() || _uiState.value.isSending || _uiState.value.hasGeneratingMessage) {
+            return
+        }
 
         viewModelScope.launch {
             _uiState.update {

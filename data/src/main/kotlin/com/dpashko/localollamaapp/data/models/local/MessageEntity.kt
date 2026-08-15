@@ -5,6 +5,7 @@ import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
 import com.dpashko.localollamaapp.domain.models.conversation.MessageRole
+import com.dpashko.localollamaapp.domain.models.conversation.MessageStatus
 
 @Entity(
     tableName = "messages",
@@ -26,5 +27,7 @@ data class MessageEntity(
     val conversationId: Long,
     val role: MessageRole,
     val content: String,
+    val status: MessageStatus,
+    val errorMessage: String?,
     val createdAtMillis: Long,
 )
