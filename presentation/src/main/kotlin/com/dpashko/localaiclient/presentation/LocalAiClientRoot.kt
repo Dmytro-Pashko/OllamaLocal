@@ -9,6 +9,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.dpashko.localaiclient.domain.models.connection.AiProvider
+import com.dpashko.localaiclient.presentation.applock.AppLockRoute
 import com.dpashko.localaiclient.presentation.chat.ChatRoute
 import com.dpashko.localaiclient.presentation.conversationlist.ConversationListRoute
 import com.dpashko.localaiclient.presentation.connection.ConnectionRoute
@@ -19,6 +20,13 @@ import com.dpashko.localaiclient.presentation.settings.SettingsRoute
  */
 @Composable
 fun LocalAiClientRoot() {
+    AppLockRoute(viewModel = hiltViewModel()) {
+        LocalAiClientNavHost()
+    }
+}
+
+@Composable
+private fun LocalAiClientNavHost() {
     val navController = rememberNavController()
 
     NavHost(
