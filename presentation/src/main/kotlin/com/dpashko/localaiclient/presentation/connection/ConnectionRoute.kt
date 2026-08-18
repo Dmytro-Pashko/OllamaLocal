@@ -43,6 +43,7 @@ fun ConnectionRoute(
         onHostChanged = viewModel::onHostChanged,
         onPortChanged = viewModel::onPortChanged,
         onConnectClick = viewModel::connect,
+        onRefreshModelsClick = viewModel::refreshModels,
         onModelSelected = viewModel::onModelSelected,
         onPresetSelected = viewModel::applyPreset,
         onSavePreset = viewModel::saveCurrentAsPreset,
@@ -63,6 +64,7 @@ private fun ConnectionScreen(
     onHostChanged: (String) -> Unit,
     onPortChanged: (String) -> Unit,
     onConnectClick: () -> Unit,
+    onRefreshModelsClick: () -> Unit,
     onModelSelected: (String) -> Unit,
     onPresetSelected: (String) -> Unit,
     onSavePreset: (String) -> Unit,
@@ -129,7 +131,7 @@ private fun ConnectionScreen(
                     modifier = Modifier.weight(1f),
                     expanded = isPresetMenuExpanded,
                     onExpandedChange = {
-                        if (!state.isConnecting && state.presets.isNotEmpty()) {
+                        if (!state.isBusy && state.presets.isNotEmpty()) {
                             isPresetMenuExpanded = !isPresetMenuExpanded
                         }
                     },
@@ -141,7 +143,7 @@ private fun ConnectionScreen(
                         value = selectedPreset?.name.orEmpty(),
                         onValueChange = {},
                         readOnly = true,
-                        enabled = !state.isConnecting && state.presets.isNotEmpty(),
+                        enabled = !state.isBusy && state.presets.isNotEmpty(),
                         label = { Text("Presets") },
                         trailingIcon = {
                             ExposedDropdownMenuDefaults.TrailingIcon(expanded = isPresetMenuExpanded)
@@ -176,7 +178,7 @@ private fun ConnectionScreen(
                     onClick = {
                         state.selectedPresetId?.let(onDeletePreset)
                     },
-                    enabled = !state.isConnecting && state.selectedPresetId != null,
+                    enabled = !state.isBusy && state.selectedPresetId != null,
                 ) {
                     Text("Delete")
                 }
@@ -185,7 +187,7 @@ private fun ConnectionScreen(
             ExposedDropdownMenuBox(
                 expanded = isProviderMenuExpanded,
                 onExpandedChange = {
-                    if (!state.isConnecting) {
+                    if (!state.isBusy) {
                         isProviderMenuExpanded = !isProviderMenuExpanded
                     }
                 },
@@ -197,7 +199,7 @@ private fun ConnectionScreen(
                     value = state.provider.displayName,
                     onValueChange = {},
                     readOnly = true,
-                    enabled = !state.isConnecting,
+                    enabled = !state.isBusy,
                     label = { Text("Provider") },
                     trailingIcon = {
                         ExposedDropdownMenuDefaults.TrailingIcon(expanded = isProviderMenuExpanded)
@@ -226,7 +228,7 @@ private fun ConnectionScreen(
                 onValueChange = onHostChanged,
                 label = { Text("IP address") },
                 singleLine = true,
-                enabled = !state.isConnecting,
+                enabled = !state.isBusy,
             )
 
             OutlinedTextField(
@@ -235,14 +237,14 @@ private fun ConnectionScreen(
                 onValueChange = onPortChanged,
                 label = { Text("Port") },
                 singleLine = true,
-                enabled = !state.isConnecting,
+                enabled = !state.isBusy,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
             )
 
             Button(
                 modifier = Modifier.fillMaxWidth(),
                 onClick = onConnectClick,
-                enabled = !state.isConnecting,
+                enabled = !state.isBusy,
             ) {
                 if (state.isConnecting) {
                     CircularProgressIndicator()
@@ -257,7 +259,7 @@ private fun ConnectionScreen(
                     presetNameText = selectedPreset?.name ?: "${state.provider.displayName} ${state.host}"
                     isSavePresetDialogVisible = true
                 },
-                enabled = !state.isConnecting && state.canSavePreset,
+                enabled = !state.isBusy && state.canSavePreset,
             ) {
                 Text("Save preset")
             }
@@ -312,8 +314,20 @@ private fun ConnectionScreen(
 
             Button(
                 modifier = Modifier.fillMaxWidth(),
+                onClick = onRefreshModelsClick,
+                enabled = state.isConnected && !state.isBusy,
+            ) {
+                if (state.isRefreshingModels) {
+                    CircularProgressIndicator()
+                } else {
+                    Text("Refresh models")
+                }
+            }
+
+            Button(
+                modifier = Modifier.fillMaxWidth(),
                 onClick = onOpenConversations,
-                enabled = state.isConnected && state.selectedModelName != null,
+                enabled = state.isConnected && state.selectedModelName != null && !state.isBusy,
             ) {
                 Text("To Conversations")
             }

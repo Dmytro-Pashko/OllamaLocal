@@ -17,6 +17,8 @@ data class ConnectionUiState(
     val port: String = AiProvider.OLLAMA.defaultPort.toString(),
     /** True while connection and model discovery are running. */
     val isConnecting: Boolean = false,
+    /** True while refreshing models for an already connected provider. */
+    val isRefreshingModels: Boolean = false,
     /** True after a successful connection and non-empty model list. */
     val isConnected: Boolean = false,
     /** Models returned by the connected provider. */
@@ -33,4 +35,8 @@ data class ConnectionUiState(
     /** True when the current connection fields can be saved as a preset. */
     val canSavePreset: Boolean
         get() = host.isNotBlank() && port.toIntOrNull() in 1..65535
+
+    /** True while any provider connection request is active. */
+    val isBusy: Boolean
+        get() = isConnecting || isRefreshingModels
 }

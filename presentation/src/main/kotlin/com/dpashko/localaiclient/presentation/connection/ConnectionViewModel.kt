@@ -61,6 +61,7 @@ class ConnectionViewModel @Inject constructor(
                         selectedModelName = connection.modelName,
                         selectedPresetId = null,
                         isConnected = false,
+                        isRefreshingModels = false,
                         models = emptyList(),
                         errorMessage = null,
                     )
@@ -78,6 +79,7 @@ class ConnectionViewModel @Inject constructor(
                 port = port.filter(Char::isDigit),
                 selectedPresetId = null,
                 isConnected = false,
+                isRefreshingModels = false,
                 models = emptyList(),
                 selectedModelName = null,
                 errorMessage = null,
@@ -95,6 +97,7 @@ class ConnectionViewModel @Inject constructor(
                 port = provider.defaultPort.toString(),
                 selectedPresetId = null,
                 isConnected = false,
+                isRefreshingModels = false,
                 models = emptyList(),
                 selectedModelName = null,
                 errorMessage = null,
@@ -111,6 +114,7 @@ class ConnectionViewModel @Inject constructor(
                 host = host,
                 selectedPresetId = null,
                 isConnected = false,
+                isRefreshingModels = false,
                 models = emptyList(),
                 selectedModelName = null,
                 errorMessage = null,
@@ -145,6 +149,7 @@ class ConnectionViewModel @Inject constructor(
                         selectedModelName = appliedPreset.modelName,
                         selectedPresetId = appliedPreset.id,
                         isConnected = false,
+                        isRefreshingModels = false,
                         models = emptyList(),
                         errorMessage = null,
                     )
@@ -231,9 +236,9 @@ class ConnectionViewModel @Inject constructor(
             _uiState.update {
                 it.copy(
                     isConnecting = true,
+                    isRefreshingModels = false,
                     isConnected = false,
                     models = emptyList(),
-                    selectedModelName = null,
                     errorMessage = null,
                 )
             }
@@ -248,21 +253,60 @@ class ConnectionViewModel @Inject constructor(
                     }
                 }
 
-                is AppResult.Success -> loadModels(config)
+                is AppResult.Success -> loadModels(
+                    config = config,
+                    preserveExistingModelsOnFailure = false,
+                )
             }
+        }
+    }
+
+    /**
+     * Refreshes models without requiring a full reconnect or clearing the previous model list on failure.
+     */
+    fun refreshModels() {
+        val config = buildConfigOrNull()
+        if (config == null) {
+            _uiState.update {
+                it.copy(errorMessage = AppError.InvalidConnectionConfig.toUserMessage())
+            }
+            return
+        }
+
+        if (_uiState.value.isBusy || !_uiState.value.isConnected) {
+            return
+        }
+
+        viewModelScope.launch {
+            _uiState.update {
+                it.copy(
+                    isRefreshingModels = true,
+                    errorMessage = null,
+                )
+            }
+
+            loadModels(
+                config = config,
+                preserveExistingModelsOnFailure = true,
+            )
         }
     }
 
     /**
      * Loads models after a successful provider connection.
      */
-    private suspend fun loadModels(config: ConnectionConfig) {
+    private suspend fun loadModels(
+        config: ConnectionConfig,
+        preserveExistingModelsOnFailure: Boolean,
+    ) {
         val preferredModelName = _uiState.value.selectedModelName
         when (val modelsResult = getAvailableModelsUseCase(config)) {
             is AppResult.Failure -> {
                 _uiState.update {
                     it.copy(
                         isConnecting = false,
+                        isRefreshingModels = false,
+                        isConnected = if (preserveExistingModelsOnFailure) it.isConnected else false,
                         errorMessage = modelsResult.error.toUserMessage(),
                     )
                 }
@@ -276,6 +320,7 @@ class ConnectionViewModel @Inject constructor(
                 _uiState.update {
                     it.copy(
                         isConnecting = false,
+                        isRefreshingModels = false,
                         isConnected = true,
                         models = models,
                         selectedModelName = selectedModelName,
