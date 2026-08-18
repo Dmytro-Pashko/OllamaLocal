@@ -31,6 +31,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
@@ -38,6 +41,7 @@ import androidx.compose.ui.unit.dp
 import com.dpashko.localollamaapp.domain.models.conversation.MessageRole
 import com.dpashko.localollamaapp.domain.models.conversation.MessageStatus
 import com.dpashko.localollamaapp.presentation.ui.models.MessageUi
+import kotlinx.coroutines.delay
 
 @Composable
 fun ChatRoute(
@@ -65,11 +69,21 @@ private fun ChatScreen(
     onRetryClick: (Long) -> Unit,
 ) {
     val listState = rememberLazyListState()
+    val hasGeneratingMessage = state.messages.any { it.status == MessageStatus.GENERATING }
+    var nowMillis by remember { mutableLongStateOf(System.currentTimeMillis()) }
 
     LaunchedEffect(state.messages.size) {
         if (state.messages.isNotEmpty()) {
             listState.animateScrollToItem(state.messages.lastIndex)
         }
+    }
+
+    LaunchedEffect(hasGeneratingMessage) {
+        while (hasGeneratingMessage) {
+            nowMillis = System.currentTimeMillis()
+            delay(1_000)
+        }
+        nowMillis = System.currentTimeMillis()
     }
 
     Scaffold(
@@ -132,6 +146,7 @@ private fun ChatScreen(
                         MessageBubble(
                             message = message,
                             isActionEnabled = !state.isSending && !state.hasGeneratingMessage,
+                            nowMillis = nowMillis,
                             onRetryClick = onRetryClick,
                         )
                     }
@@ -156,11 +171,12 @@ private fun ChatScreen(
 private fun MessageBubble(
     message: MessageUi,
     isActionEnabled: Boolean,
+    nowMillis: Long,
     onRetryClick: (Long) -> Unit,
 ) {
     val isUser = message.role == MessageRole.USER
     val bubbleText = when (message.status) {
-        MessageStatus.GENERATING -> "Generating..."
+        MessageStatus.GENERATING -> "Generating... ${formatElapsedTime(nowMillis - message.createdAtMillis)}"
         MessageStatus.FAILED -> message.errorMessage ?: "Generation failed."
         MessageStatus.SENT -> message.content
     }
@@ -221,6 +237,13 @@ private fun MessageBubble(
             }
         }
     }
+}
+
+private fun formatElapsedTime(elapsedMillis: Long): String {
+    val totalSeconds = (elapsedMillis.coerceAtLeast(0L) / 1_000).toInt()
+    val minutes = totalSeconds / 60
+    val seconds = totalSeconds % 60
+    return "%02d:%02d".format(minutes, seconds)
 }
 
 @Composable

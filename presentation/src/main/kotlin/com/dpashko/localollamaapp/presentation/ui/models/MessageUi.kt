@@ -11,6 +11,7 @@ data class MessageUi(
     val content: String,
     val status: MessageStatus,
     val errorMessage: String?,
+    val createdAtMillis: Long,
     val createdAtText: String,
 )
 
@@ -21,5 +22,6 @@ fun Message.toUi(): MessageUi =
         content = content,
         status = status,
         errorMessage = errorMessage,
+        createdAtMillis = createdAtMillis,
         createdAtText = createdAtMillis.toMessageTimeText(),
     )
