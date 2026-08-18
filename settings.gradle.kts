@@ -22,7 +22,7 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "LocalLlmApp"
+rootProject.name = "LocalAiClient"
 include(":app")
 include(":data")
 include(":domain")

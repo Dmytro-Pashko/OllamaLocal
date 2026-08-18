@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "com.dpashko.localollamaapp.presentation"
+    namespace = "com.dpashko.localaiclient.presentation"
     compileSdk {
         version = release(37)
     }

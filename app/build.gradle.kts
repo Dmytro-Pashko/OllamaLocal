@@ -6,13 +6,13 @@ plugins {
 }
 
 android {
-    namespace = "com.dpashko.localollamaapp"
+    namespace = "com.dpashko.localaiclient"
     compileSdk {
         version = release(37)
     }
 
     defaultConfig {
-        applicationId = "com.dpashko.localollamaapp"
+        applicationId = "com.dpashko.localaiclient"
         minSdk = 34
         targetSdk = 37
         versionCode = 1
