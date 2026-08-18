@@ -9,5 +9,6 @@ interface ChatGenerationScheduler {
         conversationId: Long,
         assistantMessageId: Long,
         modelName: String,
+        replaceExisting: Boolean = false,
     ): AppResult<Unit>
 }

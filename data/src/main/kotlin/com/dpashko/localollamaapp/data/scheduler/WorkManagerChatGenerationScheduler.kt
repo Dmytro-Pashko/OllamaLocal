@@ -21,6 +21,7 @@ class WorkManagerChatGenerationScheduler @Inject constructor(
         conversationId: Long,
         assistantMessageId: Long,
         modelName: String,
+        replaceExisting: Boolean,
     ): AppResult<Unit> =
         try {
             val request = OneTimeWorkRequestBuilder<GenerateAssistantMessageWorker>()
@@ -38,7 +39,7 @@ class WorkManagerChatGenerationScheduler @Inject constructor(
 
             WorkManager.getInstance(context).enqueueUniqueWork(
                 "conversation-$conversationId-generation",
-                ExistingWorkPolicy.KEEP,
+                if (replaceExisting) ExistingWorkPolicy.REPLACE else ExistingWorkPolicy.KEEP,
                 request,
             )
             AppResult.Success(Unit)
