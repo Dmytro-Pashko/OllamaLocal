@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.dpashko.localaiclient.domain.models.common.AppResult
 import com.dpashko.localaiclient.domain.models.settings.GenerationSettings
 import com.dpashko.localaiclient.domain.models.settings.SecuritySettings
+import com.dpashko.localaiclient.domain.usecases.DeleteAllSessionDataUseCase
 import com.dpashko.localaiclient.domain.usecases.ObserveGenerationSettingsUseCase
 import com.dpashko.localaiclient.domain.usecases.ObserveSecuritySettingsUseCase
 import com.dpashko.localaiclient.domain.usecases.SaveGenerationSettingsUseCase
@@ -30,6 +31,7 @@ class SettingsViewModel @Inject constructor(
     observeSecuritySettingsUseCase: ObserveSecuritySettingsUseCase,
     private val saveGenerationSettingsUseCase: SaveGenerationSettingsUseCase,
     private val saveSecuritySettingsUseCase: SaveSecuritySettingsUseCase,
+    private val deleteAllSessionDataUseCase: DeleteAllSessionDataUseCase,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(SettingsUiState())
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
@@ -45,6 +47,7 @@ class SettingsViewModel @Inject constructor(
                     it.copy(
                         timeoutMinutesText = settings.generationTimeoutMinutes.toString(),
                         errorMessage = null,
+                        sessionDeleteMessage = null,
                     )
                 }
             }
@@ -56,6 +59,7 @@ class SettingsViewModel @Inject constructor(
                     it.copy(
                         appLockEnabled = settings.appLockEnabled,
                         errorMessage = null,
+                        sessionDeleteMessage = null,
                     )
                 }
             }
@@ -71,6 +75,7 @@ class SettingsViewModel @Inject constructor(
                 it.copy(
                     timeoutMinutesText = value,
                     errorMessage = null,
+                    sessionDeleteMessage = null,
                 )
             }
         }
@@ -84,6 +89,7 @@ class SettingsViewModel @Inject constructor(
             it.copy(
                 appLockEnabled = enabled,
                 errorMessage = null,
+                sessionDeleteMessage = null,
             )
         }
     }
@@ -97,6 +103,7 @@ class SettingsViewModel @Inject constructor(
                 timeoutMinutesText = GenerationSettings.Default.generationTimeoutMinutes.toString(),
                 appLockEnabled = SecuritySettings.Default.appLockEnabled,
                 errorMessage = null,
+                sessionDeleteMessage = null,
             )
         }
     }
@@ -108,7 +115,10 @@ class SettingsViewModel @Inject constructor(
         val minutes = _uiState.value.timeoutMinutesText.toIntOrNull()
         if (minutes == null || !GenerationSettings.isValidMinutes(minutes)) {
             _uiState.update {
-                it.copy(errorMessage = "Enter a timeout from 1 to 1440 minutes.")
+                it.copy(
+                    errorMessage = "Enter a timeout from 1 to 1440 minutes.",
+                    sessionDeleteMessage = null,
+                )
             }
             return
         }
@@ -118,6 +128,7 @@ class SettingsViewModel @Inject constructor(
                 it.copy(
                     isApplying = true,
                     errorMessage = null,
+                    sessionDeleteMessage = null,
                 )
             }
 
@@ -159,6 +170,46 @@ class SettingsViewModel @Inject constructor(
                     )
                 }
                 _events.emit(SettingsEvent.Applied)
+            }
+        }
+    }
+
+    /**
+     * Permanently deletes all conversation session data after active generation is stopped.
+     */
+    fun deleteAllSessionData() {
+        if (_uiState.value.isApplying || _uiState.value.isDeletingSessionData) {
+            return
+        }
+
+        viewModelScope.launch {
+            _uiState.update {
+                it.copy(
+                    isDeletingSessionData = true,
+                    errorMessage = null,
+                    sessionDeleteMessage = null,
+                )
+            }
+
+            when (val result = deleteAllSessionDataUseCase()) {
+                is AppResult.Failure -> {
+                    _uiState.update {
+                        it.copy(
+                            isDeletingSessionData = false,
+                            errorMessage = result.error.toUserMessage(),
+                        )
+                    }
+                }
+
+                is AppResult.Success -> {
+                    _uiState.update {
+                        it.copy(
+                            isDeletingSessionData = false,
+                            errorMessage = null,
+                            sessionDeleteMessage = "All conversations deleted.",
+                        )
+                    }
+                }
             }
         }
     }
