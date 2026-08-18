@@ -15,6 +15,11 @@ interface ConversationRepository {
     fun observeConversations(): Flow<List<Conversation>>
 
     /**
+     * Observes conversation list metadata filtered by local title, model, or message text.
+     */
+    fun observeConversations(query: String): Flow<List<Conversation>>
+
+    /**
      * Observes all messages that belong to [conversationId].
      */
     fun observeMessages(conversationId: Long): Flow<List<Message>>

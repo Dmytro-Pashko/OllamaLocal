@@ -25,6 +25,10 @@ class ConversationRepositoryImpl @Inject constructor(
         conversationDao.observeConversations()
             .map { conversations -> conversations.map { it.toDomain() } }
 
+    override fun observeConversations(query: String): Flow<List<Conversation>> =
+        conversationDao.observeConversations(query.trim())
+            .map { conversations -> conversations.map { it.toDomain() } }
+
     override fun observeMessages(conversationId: Long): Flow<List<Message>> =
         conversationDao.observeMessages(conversationId)
             .map { messages -> messages.map { it.toDomain() } }

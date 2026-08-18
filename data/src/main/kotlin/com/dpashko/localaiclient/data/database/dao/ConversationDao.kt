@@ -38,6 +38,37 @@ interface ConversationDao {
     fun observeConversations(): Flow<List<ConversationListItemEntity>>
 
     /**
+     * Observes conversations matching title, model, or message text.
+     */
+    @Query(
+        """
+        SELECT
+            conversations.id,
+            conversations.title,
+            conversations.modelName,
+            conversations.createdAtMillis,
+            conversations.updatedAtMillis,
+            EXISTS(
+                SELECT 1 FROM messages
+                WHERE messages.conversationId = conversations.id
+                    AND messages.role = 'ASSISTANT'
+                    AND messages.status = 'GENERATING'
+            ) AS hasGeneratingMessage
+        FROM conversations
+        WHERE :query = ''
+            OR conversations.title LIKE '%' || :query || '%'
+            OR conversations.modelName LIKE '%' || :query || '%'
+            OR EXISTS(
+                SELECT 1 FROM messages
+                WHERE messages.conversationId = conversations.id
+                    AND messages.content LIKE '%' || :query || '%'
+            )
+        ORDER BY conversations.updatedAtMillis DESC
+        """,
+    )
+    fun observeConversations(query: String): Flow<List<ConversationListItemEntity>>
+
+    /**
      * Observes all messages for [conversationId] in chronological order.
      */
     @Query("SELECT * FROM messages WHERE conversationId = :conversationId ORDER BY createdAtMillis ASC, id ASC")

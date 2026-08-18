@@ -19,6 +19,7 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
@@ -72,6 +73,7 @@ fun ConversationListRoute(
         state = state,
         onOpenSettings = onOpenSettings,
         onDisconnect = viewModel::disconnect,
+        onSearchQueryChanged = viewModel::onSearchQueryChanged,
         onCreateConversation = viewModel::createConversation,
         onDeleteConversation = viewModel::deleteConversation,
         onOpenConversation = { conversation ->
@@ -92,6 +94,7 @@ private fun ConversationListScreen(
     state: ConversationListUiState,
     onOpenSettings: () -> Unit,
     onDisconnect: () -> Unit,
+    onSearchQueryChanged: (String) -> Unit,
     onCreateConversation: () -> Unit,
     onDeleteConversation: (Long) -> Unit,
     onOpenConversation: (ConversationUi) -> Unit,
@@ -152,34 +155,53 @@ private fun ConversationListScreen(
                 .fillMaxSize()
                 .padding(innerPadding),
         ) {
-            if (state.conversations.isEmpty()) {
-                Column(
+            Column(modifier = Modifier.fillMaxSize()) {
+                OutlinedTextField(
                     modifier = Modifier
-                        .fillMaxSize()
-                        .padding(24.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center,
-                ) {
-                    Text(
-                        text = "No conversations yet",
-                        style = MaterialTheme.typography.titleMedium,
-                    )
-                    Text(
-                        text = "Tap + to start with ${state.selectedModelName}.",
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                }
-            } else {
-                LazyColumn(modifier = Modifier.fillMaxSize()) {
-                    items(
-                        items = state.conversations,
-                        key = { it.id },
-                    ) { conversation ->
-                        SwipeConversationItem(
-                            conversation = conversation,
-                            onDeleteRequest = { pendingDeleteConversation = conversation },
-                            onOpen = { onOpenConversation(conversation) },
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    value = state.searchQuery,
+                    onValueChange = onSearchQueryChanged,
+                    enabled = !state.isDisconnecting,
+                    label = { Text("Search conversations") },
+                    singleLine = true,
+                )
+
+                if (state.conversations.isEmpty()) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center,
+                    ) {
+                        Text(
+                            text = if (state.searchQuery.isBlank()) {
+                                "No conversations yet"
+                            } else {
+                                "No matching conversations"
+                            },
+                            style = MaterialTheme.typography.titleMedium,
                         )
+                        if (state.searchQuery.isBlank()) {
+                            Text(
+                                text = "Tap + to start with ${state.selectedModelName}.",
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                        }
+                    }
+                } else {
+                    LazyColumn(modifier = Modifier.fillMaxSize()) {
+                        items(
+                            items = state.conversations,
+                            key = { it.id },
+                        ) { conversation ->
+                            SwipeConversationItem(
+                                conversation = conversation,
+                                onDeleteRequest = { pendingDeleteConversation = conversation },
+                                onOpen = { onOpenConversation(conversation) },
+                            )
+                        }
                     }
                 }
             }

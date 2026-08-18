@@ -17,6 +17,8 @@ data class ConversationListUiState(
     val selectedModelName: String = "",
     /** Conversations currently available on device. */
     val conversations: List<ConversationUi> = emptyList(),
+    /** Current local conversation search query. */
+    val searchQuery: String = "",
     /** True while disconnect is stopping all active generation work. */
     val isDisconnecting: Boolean = false,
     /** User-facing error text for list actions. */

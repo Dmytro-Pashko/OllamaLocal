@@ -8,7 +8,7 @@ import com.dpashko.localaiclient.domain.models.common.AppResult
 import com.dpashko.localaiclient.domain.models.connection.AiProvider
 import com.dpashko.localaiclient.domain.usecases.CreateConversationUseCase
 import com.dpashko.localaiclient.domain.usecases.DeleteConversationUseCase
-import com.dpashko.localaiclient.domain.usecases.ObserveConversationsUseCase
+import com.dpashko.localaiclient.domain.usecases.ObserveFilteredConversationsUseCase
 import com.dpashko.localaiclient.domain.usecases.StopAllGenerationsUseCase
 import com.dpashko.localaiclient.presentation.Routes
 import com.dpashko.localaiclient.presentation.common.toUserMessage
@@ -21,6 +21,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -30,7 +31,7 @@ import javax.inject.Inject
 @HiltViewModel
 class ConversationListViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
-    private val observeConversationsUseCase: ObserveConversationsUseCase,
+    private val observeFilteredConversationsUseCase: ObserveFilteredConversationsUseCase,
     private val createConversationUseCase: CreateConversationUseCase,
     private val deleteConversationUseCase: DeleteConversationUseCase,
     private val stopAllGenerationsUseCase: StopAllGenerationsUseCase,
@@ -52,11 +53,30 @@ class ConversationListViewModel @Inject constructor(
 
     private val _events = MutableSharedFlow<ConversationListEvent>()
     val events: SharedFlow<ConversationListEvent> = _events.asSharedFlow()
+    private var observeConversationsJob: Job? = null
 
     init {
+        observeConversations(query = "")
+    }
+
+    /**
+     * Updates local search and restarts the Room-backed conversation observation.
+     */
+    fun onSearchQueryChanged(query: String) {
+        _uiState.update {
+            it.copy(
+                searchQuery = query,
+                errorMessage = null,
+            )
+        }
+        observeConversations(query)
+    }
+
+    private fun observeConversations(query: String) {
+        observeConversationsJob?.cancel()
         // The list is fully driven by local storage so generation updates survive navigation.
-        viewModelScope.launch {
-            observeConversationsUseCase().collect { conversations ->
+        observeConversationsJob = viewModelScope.launch {
+            observeFilteredConversationsUseCase(query).collect { conversations ->
                 _uiState.update {
                     it.copy(conversations = conversations.map { conversation -> conversation.toUi() })
                 }
