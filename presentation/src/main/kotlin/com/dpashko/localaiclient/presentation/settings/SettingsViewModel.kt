@@ -4,8 +4,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.dpashko.localaiclient.domain.models.common.AppResult
 import com.dpashko.localaiclient.domain.models.settings.GenerationSettings
+import com.dpashko.localaiclient.domain.models.settings.SecuritySettings
 import com.dpashko.localaiclient.domain.usecases.ObserveGenerationSettingsUseCase
+import com.dpashko.localaiclient.domain.usecases.ObserveSecuritySettingsUseCase
 import com.dpashko.localaiclient.domain.usecases.SaveGenerationSettingsUseCase
+import com.dpashko.localaiclient.domain.usecases.SaveSecuritySettingsUseCase
 import com.dpashko.localaiclient.presentation.common.toUserMessage
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -24,7 +27,9 @@ import kotlinx.coroutines.launch
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     observeGenerationSettingsUseCase: ObserveGenerationSettingsUseCase,
+    observeSecuritySettingsUseCase: ObserveSecuritySettingsUseCase,
     private val saveGenerationSettingsUseCase: SaveGenerationSettingsUseCase,
+    private val saveSecuritySettingsUseCase: SaveSecuritySettingsUseCase,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(SettingsUiState())
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
@@ -39,6 +44,17 @@ class SettingsViewModel @Inject constructor(
                 _uiState.update {
                     it.copy(
                         timeoutMinutesText = settings.generationTimeoutMinutes.toString(),
+                        errorMessage = null,
+                    )
+                }
+            }
+        }
+
+        viewModelScope.launch {
+            observeSecuritySettingsUseCase().collect { settings ->
+                _uiState.update {
+                    it.copy(
+                        appLockEnabled = settings.appLockEnabled,
                         errorMessage = null,
                     )
                 }
@@ -61,12 +77,25 @@ class SettingsViewModel @Inject constructor(
     }
 
     /**
+     * Updates the app-lock draft without applying the lock gate immediately.
+     */
+    fun onAppLockEnabledChanged(enabled: Boolean) {
+        _uiState.update {
+            it.copy(
+                appLockEnabled = enabled,
+                errorMessage = null,
+            )
+        }
+    }
+
+    /**
      * Replaces the draft timeout with the default value without saving yet.
      */
     fun resetDraftToDefault() {
         _uiState.update {
             it.copy(
                 timeoutMinutesText = GenerationSettings.Default.generationTimeoutMinutes.toString(),
+                appLockEnabled = SecuritySettings.Default.appLockEnabled,
                 errorMessage = null,
             )
         }
@@ -102,15 +131,34 @@ class SettingsViewModel @Inject constructor(
                     }
                 }
 
-                is AppResult.Success -> {
-                    _uiState.update {
-                        it.copy(
-                            isApplying = false,
-                            errorMessage = null,
-                        )
-                    }
-                    _events.emit(SettingsEvent.Applied)
+                is AppResult.Success -> saveSecuritySettings()
+            }
+        }
+    }
+
+    private suspend fun saveSecuritySettings() {
+        when (
+            val result = saveSecuritySettingsUseCase(
+                SecuritySettings(appLockEnabled = _uiState.value.appLockEnabled),
+            )
+        ) {
+            is AppResult.Failure -> {
+                _uiState.update {
+                    it.copy(
+                        isApplying = false,
+                        errorMessage = result.error.toUserMessage(),
+                    )
                 }
+            }
+
+            is AppResult.Success -> {
+                _uiState.update {
+                    it.copy(
+                        isApplying = false,
+                        errorMessage = null,
+                    )
+                }
+                _events.emit(SettingsEvent.Applied)
             }
         }
     }

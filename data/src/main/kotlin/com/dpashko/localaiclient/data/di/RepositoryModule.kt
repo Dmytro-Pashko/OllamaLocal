@@ -4,10 +4,12 @@ import com.dpashko.localaiclient.data.scheduler.WorkManagerChatGenerationSchedul
 import com.dpashko.localaiclient.data.repositories.AiProviderRepositoryImpl
 import com.dpashko.localaiclient.data.repositories.ConversationRepositoryImpl
 import com.dpashko.localaiclient.data.repositories.GenerationSettingsRepositoryImpl
+import com.dpashko.localaiclient.data.repositories.SecuritySettingsRepositoryImpl
 import com.dpashko.localaiclient.domain.repositories.ChatGenerationScheduler
 import com.dpashko.localaiclient.domain.repositories.ConversationRepository
 import com.dpashko.localaiclient.domain.repositories.AiProviderRepository
 import com.dpashko.localaiclient.domain.repositories.GenerationSettingsRepository
+import com.dpashko.localaiclient.domain.repositories.SecuritySettingsRepository
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -46,6 +48,15 @@ abstract class RepositoryModule {
     abstract fun bindGenerationSettingsRepository(
         repository: GenerationSettingsRepositoryImpl,
     ): GenerationSettingsRepository
+
+    /**
+     * Binds security settings persistence to the domain settings contract.
+     */
+    @Binds
+    @Singleton
+    abstract fun bindSecuritySettingsRepository(
+        repository: SecuritySettingsRepositoryImpl,
+    ): SecuritySettingsRepository
 
     /**
      * Binds WorkManager-backed scheduling to the domain generation scheduler contract.
