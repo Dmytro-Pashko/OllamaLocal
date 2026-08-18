@@ -40,3 +40,5 @@ Default provider ports:
 ## Privacy Model
 
 Local AI Client is designed around local network usage. Prompts, responses, and conversation metadata are persisted on device, while generation requests are sent only to the provider host configured by the user.
+
+The app does not include ads, analytics, telemetry, cloud sync, cloud backup, or third-party accounts. Release logging must not include prompts, responses, raw provider bodies, or message content.

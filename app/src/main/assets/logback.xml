@@ -12,9 +12,7 @@
         </encoder>
     </appender>
 
-    <logger name="AiProviderKtorClient" level="TRACE" />
-    <logger name="io.ktor.client.plugins.logging" level="TRACE" />
-    <logger name="com.dpashko.localaiclient.data.repositories.AiProviderRepositoryImpl" level="DEBUG" />
+    <logger name="com.dpashko.localaiclient.data.repositories.AiProviderRepositoryImpl" level="INFO" />
 
     <root level="INFO">
         <appender-ref ref="logcat" />

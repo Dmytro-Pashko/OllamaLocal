@@ -80,10 +80,9 @@ class AiProviderRepositoryImpl @Inject constructor(
                         .map { it.toDomain() }
                 }.sortedBy { it.name }
                 logger.info(
-                    "{} getModels parsed modelCount={} models={}",
+                    "{} getModels parsed modelCount={}",
                     config.provider.displayName,
                     models.size,
-                    models.joinToString { it.name },
                 )
                 AppResult.Success(models)
             } else {
@@ -196,11 +195,11 @@ class AiProviderRepositoryImpl @Inject constructor(
         val rawBody = bodyAsText()
         val errorMessage = rawBody.decodeErrorMessage()
         logger.warn(
-            "{} {} failed status={} rawBody={}",
+            "{} {} failed status={} bodyChars={}",
             provider.displayName,
             operation,
             status,
-            rawBody.take(MAX_LOG_BODY_LENGTH),
+            rawBody.length,
         )
         return when (status) {
             HttpStatusCode.RequestTimeout -> AppError.Timeout
@@ -241,7 +240,6 @@ class AiProviderRepositoryImpl @Inject constructor(
     }
 
     private companion object {
-        const val MAX_LOG_BODY_LENGTH = 4_000
         val logger = LoggerFactory.getLogger(AiProviderRepositoryImpl::class.java)
     }
 }
