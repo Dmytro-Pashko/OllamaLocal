@@ -9,6 +9,7 @@ import com.dpashko.localollamaapp.domain.models.connection.AiProvider
 import com.dpashko.localollamaapp.domain.models.connection.ConnectionConfig
 import com.dpashko.localollamaapp.domain.usecases.ObserveHasGeneratingMessageUseCase
 import com.dpashko.localollamaapp.domain.usecases.ObserveMessagesUseCase
+import com.dpashko.localollamaapp.domain.usecases.RetryGenerationUseCase
 import com.dpashko.localollamaapp.domain.usecases.SendMessageUseCase
 import com.dpashko.localollamaapp.presentation.Routes
 import com.dpashko.localollamaapp.presentation.common.toUserMessage
@@ -27,6 +28,7 @@ class ChatViewModel @Inject constructor(
     private val observeMessagesUseCase: ObserveMessagesUseCase,
     private val observeHasGeneratingMessageUseCase: ObserveHasGeneratingMessageUseCase,
     private val sendMessageUseCase: SendMessageUseCase,
+    private val retryGenerationUseCase: RetryGenerationUseCase,
 ) : ViewModel() {
     private val provider = AiProvider.fromRouteValue(savedStateHandle[Routes.ArgProvider])
     private val host = Uri.decode(savedStateHandle[Routes.ArgHost] ?: "")
@@ -96,6 +98,52 @@ class ChatViewModel @Inject constructor(
                 conversationId = conversationId,
                 modelName = modelName,
                 content = content,
+            )
+
+            when (result) {
+                is AppResult.Failure -> {
+                    _uiState.update {
+                        it.copy(
+                            isSending = false,
+                            errorMessage = result.error.toUserMessage(),
+                        )
+                    }
+                }
+
+                is AppResult.Success -> {
+                    _uiState.update {
+                        it.copy(
+                            isSending = false,
+                            errorMessage = null,
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    fun retryGeneration(assistantMessageId: Long) {
+        if (_uiState.value.isSending || _uiState.value.hasGeneratingMessage) {
+            return
+        }
+
+        viewModelScope.launch {
+            _uiState.update {
+                it.copy(
+                    isSending = true,
+                    errorMessage = null,
+                )
+            }
+
+            val result = retryGenerationUseCase(
+                config = ConnectionConfig(
+                    provider = provider,
+                    host = host,
+                    port = port,
+                ),
+                conversationId = conversationId,
+                modelName = modelName,
+                assistantMessageId = assistantMessageId,
             )
 
             when (result) {

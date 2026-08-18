@@ -135,6 +135,15 @@ class ConversationRepositoryImpl @Inject constructor(
             updateConversationTimestampForMessage(messageId)
         }
 
+    override suspend fun retryAssistantMessage(messageId: Long): AppResult<Unit> =
+        safeDatabaseCall {
+            val updatedRows = conversationDao.retryAssistantMessage(messageId)
+            if (updatedRows == 0) {
+                throw IllegalStateException("Message cannot be retried.")
+            }
+            updateConversationTimestampForMessage(messageId)
+        }
+
     private suspend fun <T> safeDatabaseCall(block: suspend () -> T): AppResult<T> =
         try {
             AppResult.Success(block())

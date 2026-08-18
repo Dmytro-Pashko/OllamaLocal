@@ -97,6 +97,19 @@ interface ConversationDao {
         errorMessage: String,
     )
 
+    @Query(
+        """
+        UPDATE messages
+        SET content = '',
+            status = 'GENERATING',
+            errorMessage = NULL
+        WHERE id = :messageId
+            AND role = 'ASSISTANT'
+            AND status = 'FAILED'
+        """,
+    )
+    suspend fun retryAssistantMessage(messageId: Long): Int
+
     @Query("DELETE FROM conversations WHERE id = :conversationId")
     suspend fun deleteConversation(conversationId: Long)
 }

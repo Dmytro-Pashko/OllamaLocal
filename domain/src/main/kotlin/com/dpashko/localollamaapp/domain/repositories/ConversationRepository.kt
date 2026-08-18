@@ -36,4 +36,6 @@ interface ConversationRepository {
         messageId: Long,
         errorMessage: String,
     ): AppResult<Unit>
+
+    suspend fun retryAssistantMessage(messageId: Long): AppResult<Unit>
 }

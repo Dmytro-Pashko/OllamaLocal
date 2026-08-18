@@ -51,6 +51,7 @@ fun ChatRoute(
         onBack = onBack,
         onMessageChanged = viewModel::onMessageChanged,
         onSendClick = viewModel::sendMessage,
+        onRetryClick = viewModel::retryGeneration,
     )
 }
 
@@ -61,6 +62,7 @@ private fun ChatScreen(
     onBack: () -> Unit,
     onMessageChanged: (String) -> Unit,
     onSendClick: () -> Unit,
+    onRetryClick: (Long) -> Unit,
 ) {
     val listState = rememberLazyListState()
 
@@ -127,7 +129,11 @@ private fun ChatScreen(
                         items = state.messages,
                         key = { it.id },
                     ) { message ->
-                        MessageBubble(message = message)
+                        MessageBubble(
+                            message = message,
+                            isActionEnabled = !state.isSending && !state.hasGeneratingMessage,
+                            onRetryClick = onRetryClick,
+                        )
                     }
                 }
             }
@@ -147,7 +153,11 @@ private fun ChatScreen(
 }
 
 @Composable
-private fun MessageBubble(message: MessageUi) {
+private fun MessageBubble(
+    message: MessageUi,
+    isActionEnabled: Boolean,
+    onRetryClick: (Long) -> Unit,
+) {
     val isUser = message.role == MessageRole.USER
     val bubbleText = when (message.status) {
         MessageStatus.GENERATING -> "Generating..."
@@ -200,6 +210,15 @@ private fun MessageBubble(message: MessageUi) {
                     MaterialTheme.colorScheme.onSurfaceVariant
                 },
             )
+            if (!isUser && message.status == MessageStatus.FAILED) {
+                Button(
+                    modifier = Modifier.align(Alignment.End),
+                    onClick = { onRetryClick(message.id) },
+                    enabled = isActionEnabled,
+                ) {
+                    Text("Retry")
+                }
+            }
         }
     }
 }
