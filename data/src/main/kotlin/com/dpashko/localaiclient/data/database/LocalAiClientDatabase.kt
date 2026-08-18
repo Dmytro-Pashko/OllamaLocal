@@ -16,7 +16,7 @@ import com.dpashko.localaiclient.data.models.local.MessageEntity
         ConversationEntity::class,
         MessageEntity::class,
     ],
-    version = 3,
+    version = 4,
     exportSchema = false,
 )
 abstract class LocalAiClientDatabase : RoomDatabase() {
@@ -42,6 +42,17 @@ abstract class LocalAiClientDatabase : RoomDatabase() {
         val MIGRATION_2_3 = object : Migration(2, 3) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE conversations ADD COLUMN isPinned INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
+        /**
+         * Adds a flag that protects manually renamed conversations from auto-title updates.
+         */
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "ALTER TABLE conversations ADD COLUMN isTitleManuallyEdited INTEGER NOT NULL DEFAULT 0",
+                )
             }
         }
     }

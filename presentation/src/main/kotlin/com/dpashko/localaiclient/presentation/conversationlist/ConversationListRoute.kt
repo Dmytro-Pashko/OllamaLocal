@@ -76,6 +76,7 @@ fun ConversationListRoute(
         onSearchQueryChanged = viewModel::onSearchQueryChanged,
         onCreateConversation = viewModel::createConversation,
         onDeleteConversation = viewModel::deleteConversation,
+        onRenameConversation = viewModel::renameConversation,
         onSetConversationPinned = viewModel::setConversationPinned,
         onOpenConversation = { conversation ->
             onOpenConversation(
@@ -98,10 +99,13 @@ private fun ConversationListScreen(
     onSearchQueryChanged: (String) -> Unit,
     onCreateConversation: () -> Unit,
     onDeleteConversation: (Long) -> Unit,
+    onRenameConversation: (Long, String) -> Unit,
     onSetConversationPinned: (Long, Boolean) -> Unit,
     onOpenConversation: (ConversationUi) -> Unit,
 ) {
     var pendingDeleteConversation by remember { mutableStateOf<ConversationUi?>(null) }
+    var pendingRenameConversation by remember { mutableStateOf<ConversationUi?>(null) }
+    var renameText by remember { mutableStateOf("") }
 
     pendingDeleteConversation?.let { conversation ->
         AlertDialog(
@@ -120,6 +124,39 @@ private fun ConversationListScreen(
             },
             dismissButton = {
                 TextButton(onClick = { pendingDeleteConversation = null }) {
+                    Text("Cancel")
+                }
+            },
+        )
+    }
+
+    pendingRenameConversation?.let { conversation ->
+        AlertDialog(
+            onDismissRequest = { pendingRenameConversation = null },
+            title = { Text("Rename conversation") },
+            text = {
+                OutlinedTextField(
+                    modifier = Modifier.fillMaxWidth(),
+                    value = renameText,
+                    onValueChange = { renameText = it },
+                    label = { Text("Title") },
+                    singleLine = true,
+                    isError = renameText.length > 48,
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        pendingRenameConversation = null
+                        onRenameConversation(conversation.id, renameText)
+                    },
+                    enabled = renameText.isNotBlank() && renameText.length <= 48,
+                ) {
+                    Text("Save")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingRenameConversation = null }) {
                     Text("Cancel")
                 }
             },
@@ -198,11 +235,15 @@ private fun ConversationListScreen(
                             items = state.conversations,
                             key = { it.id },
                         ) { conversation ->
-                        SwipeConversationItem(
-                            conversation = conversation,
-                            onDeleteRequest = { pendingDeleteConversation = conversation },
-                            onTogglePinned = {
-                                onSetConversationPinned(conversation.id, !conversation.isPinned)
+                            SwipeConversationItem(
+                                conversation = conversation,
+                                onDeleteRequest = { pendingDeleteConversation = conversation },
+                                onRenameRequest = {
+                                    renameText = conversation.title
+                                    pendingRenameConversation = conversation
+                                },
+                                onTogglePinned = {
+                                    onSetConversationPinned(conversation.id, !conversation.isPinned)
                             },
                             onOpen = { onOpenConversation(conversation) },
                         )
@@ -229,6 +270,7 @@ private fun ConversationListScreen(
 private fun SwipeConversationItem(
     conversation: ConversationUi,
     onDeleteRequest: () -> Unit,
+    onRenameRequest: () -> Unit,
     onTogglePinned: () -> Unit,
     onOpen: () -> Unit,
 ) {
@@ -277,6 +319,9 @@ private fun SwipeConversationItem(
                     ) {
                         TextButton(onClick = onTogglePinned) {
                             Text(if (conversation.isPinned) "Unpin" else "Pin")
+                        }
+                        TextButton(onClick = onRenameRequest) {
+                            Text("Rename")
                         }
                         if (conversation.hasGeneratingMessage) {
                             CircularProgressIndicator(modifier = Modifier.size(24.dp))

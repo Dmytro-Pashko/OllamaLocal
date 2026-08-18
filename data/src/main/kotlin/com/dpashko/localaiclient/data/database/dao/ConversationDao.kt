@@ -170,6 +170,42 @@ interface ConversationDao {
     )
 
     /**
+     * Updates auto-generated title only while the title has not been manually edited.
+     */
+    @Query(
+        """
+        UPDATE conversations
+        SET title = :title,
+            updatedAtMillis = :updatedAtMillis
+        WHERE id = :conversationId
+            AND isTitleManuallyEdited = 0
+        """,
+    )
+    suspend fun updateConversationAutoTitleAndTimestamp(
+        conversationId: Long,
+        title: String,
+        updatedAtMillis: Long,
+    ): Int
+
+    /**
+     * Updates a user-edited title and protects it from future auto-title updates.
+     */
+    @Query(
+        """
+        UPDATE conversations
+        SET title = :title,
+            isTitleManuallyEdited = 1,
+            updatedAtMillis = :updatedAtMillis
+        WHERE id = :conversationId
+        """,
+    )
+    suspend fun renameConversation(
+        conversationId: Long,
+        title: String,
+        updatedAtMillis: Long,
+    ): Int
+
+    /**
      * Updates only the last activity timestamp for a conversation.
      */
     @Query("UPDATE conversations SET updatedAtMillis = :updatedAtMillis WHERE id = :conversationId")

@@ -15,6 +15,8 @@ data class ConversationEntity(
     val title: String,
     /** True when the conversation should be shown above regular conversations. */
     val isPinned: Boolean = false,
+    /** True when the title was edited by the user and should not be auto-generated. */
+    val isTitleManuallyEdited: Boolean = false,
     /** Model selected for this conversation. */
     val modelName: String,
     /** Creation timestamp in epoch milliseconds. */

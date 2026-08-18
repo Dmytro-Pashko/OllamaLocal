@@ -16,6 +16,9 @@ sealed interface AppError {
     /** Generation settings are outside the accepted range. */
     data object InvalidGenerationSettings : AppError
 
+    /** Conversation title is blank or too long. */
+    data object InvalidConversationTitle : AppError
+
     /** Local provider could not be reached over the network. */
     data object NetworkUnavailable : AppError
 

@@ -53,6 +53,7 @@ class ConversationRepositoryImpl @Inject constructor(
                 ConversationEntity(
                     title = "New conversation",
                     isPinned = false,
+                    isTitleManuallyEdited = false,
                     modelName = modelName,
                     createdAtMillis = now,
                     updatedAtMillis = now,
@@ -87,6 +88,21 @@ class ConversationRepositoryImpl @Inject constructor(
             }
         }
 
+    override suspend fun renameConversation(
+        conversationId: Long,
+        title: String,
+    ): AppResult<Unit> =
+        safeDatabaseCall {
+            val updatedRows = conversationDao.renameConversation(
+                conversationId = conversationId,
+                title = title,
+                updatedAtMillis = System.currentTimeMillis(),
+            )
+            if (updatedRows == 0) {
+                throw IllegalStateException("Conversation cannot be renamed.")
+            }
+        }
+
     override suspend fun addUserMessage(
         conversationId: Long,
         content: String,
@@ -106,11 +122,17 @@ class ConversationRepositoryImpl @Inject constructor(
             )
 
             if (messageCount == 0) {
-                conversationDao.updateConversationTitleAndTimestamp(
+                val updatedRows = conversationDao.updateConversationAutoTitleAndTimestamp(
                     conversationId = conversationId,
                     title = content.toConversationTitle(),
                     updatedAtMillis = now,
                 )
+                if (updatedRows == 0) {
+                    conversationDao.updateConversationTimestamp(
+                        conversationId = conversationId,
+                        updatedAtMillis = now,
+                    )
+                }
             } else {
                 conversationDao.updateConversationTimestamp(
                     conversationId = conversationId,
@@ -251,11 +273,17 @@ class ConversationRepositoryImpl @Inject constructor(
                 ) == 0
 
                 if (isFirstMessage) {
-                    conversationDao.updateConversationTitleAndTimestamp(
+                    val updatedRows = conversationDao.updateConversationAutoTitleAndTimestamp(
                         conversationId = conversationId,
                         title = content.toConversationTitle(),
                         updatedAtMillis = now,
                     )
+                    if (updatedRows == 0) {
+                        conversationDao.updateConversationTimestamp(
+                            conversationId = conversationId,
+                            updatedAtMillis = now,
+                        )
+                    }
                 } else {
                     conversationDao.updateConversationTimestamp(
                         conversationId = conversationId,

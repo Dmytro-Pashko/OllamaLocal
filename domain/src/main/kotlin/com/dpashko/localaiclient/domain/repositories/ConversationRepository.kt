@@ -63,6 +63,14 @@ interface ConversationRepository {
     ): AppResult<Unit>
 
     /**
+     * Manually renames a conversation and protects it from auto-title updates.
+     */
+    suspend fun renameConversation(
+        conversationId: Long,
+        title: String,
+    ): AppResult<Unit>
+
+    /**
      * Adds a user message to [conversationId] and returns the inserted message id.
      */
     suspend fun addUserMessage(

@@ -186,6 +186,7 @@ class GenerateAssistantMessageWorker @AssistedInject constructor(
             AppError.EmptyModels -> "No local models found."
             AppError.InvalidConnectionConfig -> "Invalid connection config."
             AppError.InvalidGenerationSettings -> "Invalid generation settings."
+            AppError.InvalidConversationTitle -> "Invalid conversation title."
             AppError.NetworkUnavailable -> "Provider is not reachable."
             AppError.Timeout -> "Provider request timed out."
             is AppError.Http -> "HTTP $code: ${message ?: "Request failed"}"
