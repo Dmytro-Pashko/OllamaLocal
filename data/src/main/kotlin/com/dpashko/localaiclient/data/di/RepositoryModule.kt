@@ -14,27 +14,42 @@ import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
+/**
+ * Hilt binding contract from domain repository interfaces to data implementations.
+ */
 @Module
 @InstallIn(SingletonComponent::class)
 abstract class RepositoryModule {
+    /**
+     * Binds local Room-backed conversation storage to the domain repository contract.
+     */
     @Binds
     @Singleton
     abstract fun bindConversationRepository(
         repository: ConversationRepositoryImpl,
     ): ConversationRepository
 
+    /**
+     * Binds local provider HTTP communication to the domain provider contract.
+     */
     @Binds
     @Singleton
     abstract fun bindAiProviderRepository(
         repository: AiProviderRepositoryImpl,
     ): AiProviderRepository
 
+    /**
+     * Binds generation settings persistence to the domain settings contract.
+     */
     @Binds
     @Singleton
     abstract fun bindGenerationSettingsRepository(
         repository: GenerationSettingsRepositoryImpl,
     ): GenerationSettingsRepository
 
+    /**
+     * Binds WorkManager-backed scheduling to the domain generation scheduler contract.
+     */
     @Binds
     @Singleton
     abstract fun bindChatGenerationScheduler(

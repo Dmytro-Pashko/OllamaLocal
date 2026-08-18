@@ -9,8 +9,14 @@ import com.dpashko.localaiclient.data.models.local.ConversationListItemEntity
 import com.dpashko.localaiclient.data.models.local.MessageEntity
 import kotlinx.coroutines.flow.Flow
 
+/**
+ * Room access contract for conversations and messages stored on device.
+ */
 @Dao
 interface ConversationDao {
+    /**
+     * Observes conversation list rows with a derived active-generation flag.
+     */
     @Query(
         """
         SELECT
@@ -31,15 +37,27 @@ interface ConversationDao {
     )
     fun observeConversations(): Flow<List<ConversationListItemEntity>>
 
+    /**
+     * Observes all messages for [conversationId] in chronological order.
+     */
     @Query("SELECT * FROM messages WHERE conversationId = :conversationId ORDER BY createdAtMillis ASC, id ASC")
     fun observeMessages(conversationId: Long): Flow<List<MessageEntity>>
 
+    /**
+     * Returns all messages for [conversationId] in chronological order.
+     */
     @Query("SELECT * FROM messages WHERE conversationId = :conversationId ORDER BY createdAtMillis ASC, id ASC")
     suspend fun getMessages(conversationId: Long): List<MessageEntity>
 
+    /**
+     * Returns one message by id, or null when it no longer exists.
+     */
     @Query("SELECT * FROM messages WHERE id = :messageId")
     suspend fun getMessage(messageId: Long): MessageEntity?
 
+    /**
+     * Returns sent, non-empty messages that are eligible for provider context.
+     */
     @Query(
         """
         SELECT * FROM messages
@@ -51,9 +69,15 @@ interface ConversationDao {
     )
     suspend fun getContextMessages(conversationId: Long): List<MessageEntity>
 
+    /**
+     * Counts messages currently stored for [conversationId].
+     */
     @Query("SELECT COUNT(*) FROM messages WHERE conversationId = :conversationId")
     suspend fun getMessageCount(conversationId: Long): Int
 
+    /**
+     * Observes whether [conversationId] has a generating assistant message.
+     */
     @Query(
         """
         SELECT EXISTS(
@@ -66,12 +90,21 @@ interface ConversationDao {
     )
     fun observeHasGeneratingMessage(conversationId: Long): Flow<Boolean>
 
+    /**
+     * Returns true when a message row exists for [messageId].
+     */
     @Query("SELECT EXISTS(SELECT 1 FROM messages WHERE id = :messageId)")
     suspend fun messageExists(messageId: Long): Boolean
 
+    /**
+     * Returns the owning conversation id for [messageId], or null when absent.
+     */
     @Query("SELECT conversationId FROM messages WHERE id = :messageId")
     suspend fun getConversationIdForMessage(messageId: Long): Long?
 
+    /**
+     * Returns conversation ids that currently contain generating assistant messages.
+     */
     @Query(
         """
         SELECT DISTINCT conversationId FROM messages
@@ -81,12 +114,21 @@ interface ConversationDao {
     )
     suspend fun getGeneratingConversationIds(): List<Long>
 
+    /**
+     * Inserts a conversation and returns the generated id.
+     */
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insertConversation(conversation: ConversationEntity): Long
 
+    /**
+     * Inserts a message and returns the generated id.
+     */
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insertMessage(message: MessageEntity): Long
 
+    /**
+     * Updates both display title and last activity timestamp for a conversation.
+     */
     @Query("UPDATE conversations SET title = :title, updatedAtMillis = :updatedAtMillis WHERE id = :conversationId")
     suspend fun updateConversationTitleAndTimestamp(
         conversationId: Long,
@@ -94,12 +136,18 @@ interface ConversationDao {
         updatedAtMillis: Long,
     )
 
+    /**
+     * Updates only the last activity timestamp for a conversation.
+     */
     @Query("UPDATE conversations SET updatedAtMillis = :updatedAtMillis WHERE id = :conversationId")
     suspend fun updateConversationTimestamp(
         conversationId: Long,
         updatedAtMillis: Long,
     )
 
+    /**
+     * Completes a generating assistant placeholder and returns the affected row count.
+     */
     @Query(
         """
         UPDATE messages
@@ -116,6 +164,9 @@ interface ConversationDao {
         content: String,
     ): Int
 
+    /**
+     * Marks a generating assistant placeholder as failed and returns the affected row count.
+     */
     @Query(
         """
         UPDATE messages
@@ -131,6 +182,9 @@ interface ConversationDao {
         errorMessage: String,
     ): Int
 
+    /**
+     * Cancels generating assistant messages for one conversation and returns affected rows.
+     */
     @Query(
         """
         UPDATE messages
@@ -146,6 +200,9 @@ interface ConversationDao {
         message: String,
     ): Int
 
+    /**
+     * Cancels generating assistant messages for multiple conversations and returns affected rows.
+     */
     @Query(
         """
         UPDATE messages
@@ -161,12 +218,18 @@ interface ConversationDao {
         message: String,
     ): Int
 
+    /**
+     * Updates last activity timestamps for conversations touched by bulk cancellation.
+     */
     @Query("UPDATE conversations SET updatedAtMillis = :updatedAtMillis WHERE id IN (:conversationIds)")
     suspend fun updateConversationTimestamps(
         conversationIds: List<Long>,
         updatedAtMillis: Long,
     )
 
+    /**
+     * Resets a failed assistant message for retry and returns the affected row count.
+     */
     @Query(
         """
         UPDATE messages
@@ -180,6 +243,9 @@ interface ConversationDao {
     )
     suspend fun retryAssistantMessage(messageId: Long): Int
 
+    /**
+     * Updates a user message and returns the affected row count.
+     */
     @Query(
         """
         UPDATE messages
@@ -197,6 +263,9 @@ interface ConversationDao {
         content: String,
     ): Int
 
+    /**
+     * Deletes messages newer than the edited message in the same conversation.
+     */
     @Query(
         """
         DELETE FROM messages
@@ -213,6 +282,9 @@ interface ConversationDao {
         messageId: Long,
     )
 
+    /**
+     * Counts messages earlier than the supplied message position in one conversation.
+     */
     @Query(
         """
         SELECT COUNT(*) FROM messages
@@ -229,6 +301,9 @@ interface ConversationDao {
         messageId: Long,
     ): Int
 
+    /**
+     * Deletes a conversation; message rows are removed by the Room foreign-key cascade.
+     */
     @Query("DELETE FROM conversations WHERE id = :conversationId")
     suspend fun deleteConversation(conversationId: Long)
 }

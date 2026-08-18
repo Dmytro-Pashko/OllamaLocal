@@ -8,6 +8,9 @@ import com.dpashko.localaiclient.data.database.dao.ConversationDao
 import com.dpashko.localaiclient.data.models.local.ConversationEntity
 import com.dpashko.localaiclient.data.models.local.MessageEntity
 
+/**
+ * Room database that stores local conversations and chat messages.
+ */
 @Database(
     entities = [
         ConversationEntity::class,
@@ -17,9 +20,15 @@ import com.dpashko.localaiclient.data.models.local.MessageEntity
     exportSchema = false,
 )
 abstract class LocalAiClientDatabase : RoomDatabase() {
+    /**
+     * Provides conversation and message DAO operations.
+     */
     abstract fun conversationDao(): ConversationDao
 
     companion object {
+        /**
+         * Adds assistant message lifecycle fields introduced for persisted background generation.
+         */
         val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE messages ADD COLUMN status TEXT NOT NULL DEFAULT 'SENT'")
