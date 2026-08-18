@@ -45,6 +45,11 @@ interface ConversationRepository {
     suspend fun deleteConversation(conversationId: Long): AppResult<Unit>
 
     /**
+     * Permanently deletes all locally stored conversations and messages.
+     */
+    suspend fun deleteAllSessionData(): AppResult<Unit>
+
+    /**
      * Adds a user message to [conversationId] and returns the inserted message id.
      */
     suspend fun addUserMessage(

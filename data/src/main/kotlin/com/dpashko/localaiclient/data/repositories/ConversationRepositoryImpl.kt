@@ -60,6 +60,14 @@ class ConversationRepositoryImpl @Inject constructor(
             conversationDao.deleteConversation(conversationId)
         }
 
+    override suspend fun deleteAllSessionData(): AppResult<Unit> =
+        safeDatabaseCall {
+            database.withTransaction {
+                conversationDao.deleteAllMessages()
+                conversationDao.deleteAllConversations()
+            }
+        }
+
     override suspend fun addUserMessage(
         conversationId: Long,
         content: String,

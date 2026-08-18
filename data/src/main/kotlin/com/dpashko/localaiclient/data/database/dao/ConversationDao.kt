@@ -306,4 +306,16 @@ interface ConversationDao {
      */
     @Query("DELETE FROM conversations WHERE id = :conversationId")
     suspend fun deleteConversation(conversationId: Long)
+
+    /**
+     * Deletes all message rows for permanent session cleanup.
+     */
+    @Query("DELETE FROM messages")
+    suspend fun deleteAllMessages()
+
+    /**
+     * Deletes all conversation rows for permanent session cleanup.
+     */
+    @Query("DELETE FROM conversations")
+    suspend fun deleteAllConversations()
 }
