@@ -11,6 +11,7 @@ data class ChatUiState(
     val conversationId: Long = 0L,
     val messages: List<MessageUi> = emptyList(),
     val messageText: String = "",
+    val editingMessageId: Long? = null,
     val isSending: Boolean = false,
     val hasGeneratingMessage: Boolean = false,
     val errorMessage: String? = null,

@@ -32,6 +32,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -66,6 +67,8 @@ fun ChatRoute(
         onBack = onBack,
         onMessageChanged = viewModel::onMessageChanged,
         onSendClick = viewModel::sendMessage,
+        onCancelEditClick = viewModel::cancelEditingMessage,
+        onEditClick = { message -> viewModel.startEditingMessage(message.id, message.content) },
         onRetryClick = viewModel::retryGeneration,
     )
 }
@@ -77,6 +80,8 @@ private fun ChatScreen(
     onBack: () -> Unit,
     onMessageChanged: (String) -> Unit,
     onSendClick: () -> Unit,
+    onCancelEditClick: () -> Unit,
+    onEditClick: (MessageUi) -> Unit,
     onRetryClick: (Long) -> Unit,
 ) {
     val listState = rememberLazyListState()
@@ -129,8 +134,10 @@ private fun ChatScreen(
                 messageText = state.messageText,
                 isSending = state.isSending,
                 hasGeneratingMessage = state.hasGeneratingMessage,
+                isEditing = state.editingMessageId != null,
                 onMessageChanged = onMessageChanged,
                 onSendClick = onSendClick,
+                onCancelEditClick = onCancelEditClick,
             )
         },
     ) { innerPadding ->
@@ -173,6 +180,10 @@ private fun ChatScreen(
                                     snackbarHostState.showSnackbar("Message copied")
                                 }
                             },
+                            onEditClick = {
+                                actionMessage = null
+                                onEditClick(message)
+                            },
                             onRetryClick = onRetryClick,
                         )
                     }
@@ -203,6 +214,7 @@ private fun MessageBubble(
     onMessageLongPress: () -> Unit,
     onDismissActionsMenu: () -> Unit,
     onCopyClick: () -> Unit,
+    onEditClick: () -> Unit,
     onRetryClick: (Long) -> Unit,
 ) {
     val isUser = message.role == MessageRole.USER
@@ -274,6 +286,12 @@ private fun MessageBubble(
                     text = { Text("Copy") },
                     onClick = onCopyClick,
                 )
+                if (isUser && isActionEnabled) {
+                    DropdownMenuItem(
+                        text = { Text("Edit") },
+                        onClick = onEditClick,
+                    )
+                }
             }
         }
     }
@@ -298,8 +316,10 @@ private fun MessageInputBar(
     messageText: String,
     isSending: Boolean,
     hasGeneratingMessage: Boolean,
+    isEditing: Boolean,
     onMessageChanged: (String) -> Unit,
     onSendClick: () -> Unit,
+    onCancelEditClick: () -> Unit,
 ) {
     Row(
         modifier = Modifier
@@ -317,8 +337,17 @@ private fun MessageInputBar(
             enabled = !isSending,
             minLines = 1,
             maxLines = 4,
-            placeholder = { Text("Message") },
+            placeholder = { Text(if (isEditing) "Edit message" else "Message") },
         )
+
+        if (isEditing) {
+            TextButton(
+                onClick = onCancelEditClick,
+                enabled = !isSending,
+            ) {
+                Text("Cancel")
+            }
+        }
 
         Button(
             onClick = onSendClick,
@@ -327,7 +356,7 @@ private fun MessageInputBar(
             if (isSending) {
                 CircularProgressIndicator()
             } else {
-                Text("Send")
+                Text(if (isEditing) "Save" else "Send")
             }
         }
     }

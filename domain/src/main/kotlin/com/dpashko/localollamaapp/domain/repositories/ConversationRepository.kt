@@ -38,4 +38,10 @@ interface ConversationRepository {
     ): AppResult<Unit>
 
     suspend fun retryAssistantMessage(messageId: Long): AppResult<Unit>
+
+    suspend fun editUserMessageAndDeleteNewer(
+        conversationId: Long,
+        messageId: Long,
+        content: String,
+    ): AppResult<Unit>
 }

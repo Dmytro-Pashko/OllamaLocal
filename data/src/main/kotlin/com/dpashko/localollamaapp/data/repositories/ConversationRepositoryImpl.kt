@@ -1,5 +1,7 @@
 package com.dpashko.localollamaapp.data.repositories
 
+import androidx.room.withTransaction
+import com.dpashko.localollamaapp.data.database.LocalLlmDatabase
 import com.dpashko.localollamaapp.data.database.dao.ConversationDao
 import com.dpashko.localollamaapp.data.mappers.toDomain
 import com.dpashko.localollamaapp.data.models.local.ConversationEntity
@@ -16,6 +18,7 @@ import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 
 class ConversationRepositoryImpl @Inject constructor(
+    private val database: LocalLlmDatabase,
     private val conversationDao: ConversationDao,
 ) : ConversationRepository {
     override fun observeConversations(): Flow<List<Conversation>> =
@@ -142,6 +145,56 @@ class ConversationRepositoryImpl @Inject constructor(
                 throw IllegalStateException("Message cannot be retried.")
             }
             updateConversationTimestampForMessage(messageId)
+        }
+
+    override suspend fun editUserMessageAndDeleteNewer(
+        conversationId: Long,
+        messageId: Long,
+        content: String,
+    ): AppResult<Unit> =
+        safeDatabaseCall {
+            database.withTransaction {
+                val message = conversationDao.getMessage(messageId)
+                    ?: throw IllegalStateException("Message cannot be edited.")
+                if (message.conversationId != conversationId || message.role != MessageRole.USER) {
+                    throw IllegalStateException("Message cannot be edited.")
+                }
+
+                val updatedRows = conversationDao.updateUserMessage(
+                    conversationId = conversationId,
+                    messageId = messageId,
+                    content = content,
+                )
+                if (updatedRows == 0) {
+                    throw IllegalStateException("Message cannot be edited.")
+                }
+
+                conversationDao.deleteMessagesAfter(
+                    conversationId = conversationId,
+                    createdAtMillis = message.createdAtMillis,
+                    messageId = message.id,
+                )
+
+                val now = System.currentTimeMillis()
+                val isFirstMessage = conversationDao.getEarlierMessageCount(
+                    conversationId = conversationId,
+                    createdAtMillis = message.createdAtMillis,
+                    messageId = message.id,
+                ) == 0
+
+                if (isFirstMessage) {
+                    conversationDao.updateConversationTitleAndTimestamp(
+                        conversationId = conversationId,
+                        title = content.toConversationTitle(),
+                        updatedAtMillis = now,
+                    )
+                } else {
+                    conversationDao.updateConversationTimestamp(
+                        conversationId = conversationId,
+                        updatedAtMillis = now,
+                    )
+                }
+            }
         }
 
     private suspend fun <T> safeDatabaseCall(block: suspend () -> T): AppResult<T> =

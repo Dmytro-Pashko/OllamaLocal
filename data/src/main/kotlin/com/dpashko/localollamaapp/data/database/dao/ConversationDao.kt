@@ -19,6 +19,9 @@ interface ConversationDao {
     @Query("SELECT * FROM messages WHERE conversationId = :conversationId ORDER BY createdAtMillis ASC, id ASC")
     suspend fun getMessages(conversationId: Long): List<MessageEntity>
 
+    @Query("SELECT * FROM messages WHERE id = :messageId")
+    suspend fun getMessage(messageId: Long): MessageEntity?
+
     @Query(
         """
         SELECT * FROM messages
@@ -109,6 +112,55 @@ interface ConversationDao {
         """,
     )
     suspend fun retryAssistantMessage(messageId: Long): Int
+
+    @Query(
+        """
+        UPDATE messages
+        SET content = :content,
+            status = 'SENT',
+            errorMessage = NULL
+        WHERE id = :messageId
+            AND conversationId = :conversationId
+            AND role = 'USER'
+        """,
+    )
+    suspend fun updateUserMessage(
+        conversationId: Long,
+        messageId: Long,
+        content: String,
+    ): Int
+
+    @Query(
+        """
+        DELETE FROM messages
+        WHERE conversationId = :conversationId
+            AND (
+                createdAtMillis > :createdAtMillis
+                OR (createdAtMillis = :createdAtMillis AND id > :messageId)
+            )
+        """,
+    )
+    suspend fun deleteMessagesAfter(
+        conversationId: Long,
+        createdAtMillis: Long,
+        messageId: Long,
+    )
+
+    @Query(
+        """
+        SELECT COUNT(*) FROM messages
+        WHERE conversationId = :conversationId
+            AND (
+                createdAtMillis < :createdAtMillis
+                OR (createdAtMillis = :createdAtMillis AND id < :messageId)
+            )
+        """,
+    )
+    suspend fun getEarlierMessageCount(
+        conversationId: Long,
+        createdAtMillis: Long,
+        messageId: Long,
+    ): Int
 
     @Query("DELETE FROM conversations WHERE id = :conversationId")
     suspend fun deleteConversation(conversationId: Long)

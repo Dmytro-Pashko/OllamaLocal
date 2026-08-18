@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import com.dpashko.localollamaapp.domain.models.common.AppResult
 import com.dpashko.localollamaapp.domain.models.connection.AiProvider
 import com.dpashko.localollamaapp.domain.models.connection.ConnectionConfig
+import com.dpashko.localollamaapp.domain.usecases.EditMessageAndRegenerateUseCase
 import com.dpashko.localollamaapp.domain.usecases.ObserveHasGeneratingMessageUseCase
 import com.dpashko.localollamaapp.domain.usecases.ObserveMessagesUseCase
 import com.dpashko.localollamaapp.domain.usecases.RetryGenerationUseCase
@@ -29,6 +30,7 @@ class ChatViewModel @Inject constructor(
     private val observeHasGeneratingMessageUseCase: ObserveHasGeneratingMessageUseCase,
     private val sendMessageUseCase: SendMessageUseCase,
     private val retryGenerationUseCase: RetryGenerationUseCase,
+    private val editMessageAndRegenerateUseCase: EditMessageAndRegenerateUseCase,
 ) : ViewModel() {
     private val provider = AiProvider.fromRouteValue(savedStateHandle[Routes.ArgProvider])
     private val host = Uri.decode(savedStateHandle[Routes.ArgHost] ?: "")
@@ -74,9 +76,42 @@ class ChatViewModel @Inject constructor(
         }
     }
 
+    fun startEditingMessage(
+        messageId: Long,
+        content: String,
+    ) {
+        if (_uiState.value.isSending || _uiState.value.hasGeneratingMessage) {
+            return
+        }
+
+        _uiState.update {
+            it.copy(
+                editingMessageId = messageId,
+                messageText = content,
+                errorMessage = null,
+            )
+        }
+    }
+
+    fun cancelEditingMessage() {
+        _uiState.update {
+            it.copy(
+                editingMessageId = null,
+                messageText = "",
+                errorMessage = null,
+            )
+        }
+    }
+
     fun sendMessage() {
-        val content = _uiState.value.messageText
-        if (content.isBlank() || _uiState.value.isSending || _uiState.value.hasGeneratingMessage) {
+        val state = _uiState.value
+        val content = state.messageText
+        state.editingMessageId?.let { messageId ->
+            saveEditedMessage(messageId, content)
+            return
+        }
+
+        if (content.isBlank() || state.isSending || state.hasGeneratingMessage) {
             return
         }
 
@@ -105,6 +140,60 @@ class ChatViewModel @Inject constructor(
                     _uiState.update {
                         it.copy(
                             isSending = false,
+                            errorMessage = result.error.toUserMessage(),
+                        )
+                    }
+                }
+
+                is AppResult.Success -> {
+                    _uiState.update {
+                        it.copy(
+                            isSending = false,
+                            errorMessage = null,
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    private fun saveEditedMessage(
+        messageId: Long,
+        content: String,
+    ) {
+        if (content.isBlank() || _uiState.value.isSending || _uiState.value.hasGeneratingMessage) {
+            return
+        }
+
+        viewModelScope.launch {
+            _uiState.update {
+                it.copy(
+                    isSending = true,
+                    messageText = "",
+                    editingMessageId = null,
+                    errorMessage = null,
+                )
+            }
+
+            val result = editMessageAndRegenerateUseCase(
+                config = ConnectionConfig(
+                    provider = provider,
+                    host = host,
+                    port = port,
+                ),
+                conversationId = conversationId,
+                modelName = modelName,
+                messageId = messageId,
+                content = content,
+            )
+
+            when (result) {
+                is AppResult.Failure -> {
+                    _uiState.update {
+                        it.copy(
+                            isSending = false,
+                            editingMessageId = messageId,
+                            messageText = content,
                             errorMessage = result.error.toUserMessage(),
                         )
                     }
