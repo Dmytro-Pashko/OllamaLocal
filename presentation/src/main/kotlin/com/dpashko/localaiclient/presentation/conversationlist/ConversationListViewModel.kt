@@ -9,6 +9,7 @@ import com.dpashko.localaiclient.domain.models.connection.AiProvider
 import com.dpashko.localaiclient.domain.usecases.CreateConversationUseCase
 import com.dpashko.localaiclient.domain.usecases.DeleteConversationUseCase
 import com.dpashko.localaiclient.domain.usecases.ObserveFilteredConversationsUseCase
+import com.dpashko.localaiclient.domain.usecases.SetConversationPinnedUseCase
 import com.dpashko.localaiclient.domain.usecases.StopAllGenerationsUseCase
 import com.dpashko.localaiclient.presentation.Routes
 import com.dpashko.localaiclient.presentation.common.toUserMessage
@@ -34,6 +35,7 @@ class ConversationListViewModel @Inject constructor(
     private val observeFilteredConversationsUseCase: ObserveFilteredConversationsUseCase,
     private val createConversationUseCase: CreateConversationUseCase,
     private val deleteConversationUseCase: DeleteConversationUseCase,
+    private val setConversationPinnedUseCase: SetConversationPinnedUseCase,
     private val stopAllGenerationsUseCase: StopAllGenerationsUseCase,
 ) : ViewModel() {
     private val provider = AiProvider.fromRouteValue(savedStateHandle[Routes.ArgProvider])
@@ -116,6 +118,26 @@ class ConversationListViewModel @Inject constructor(
     fun deleteConversation(conversationId: Long) {
         viewModelScope.launch {
             when (val result = deleteConversationUseCase(conversationId)) {
+                is AppResult.Failure -> {
+                    _uiState.update { it.copy(errorMessage = result.error.toUserMessage()) }
+                }
+
+                is AppResult.Success -> {
+                    _uiState.update { it.copy(errorMessage = null) }
+                }
+            }
+        }
+    }
+
+    /**
+     * Pins or unpins a conversation in the local list.
+     */
+    fun setConversationPinned(
+        conversationId: Long,
+        isPinned: Boolean,
+    ) {
+        viewModelScope.launch {
+            when (val result = setConversationPinnedUseCase(conversationId, isPinned)) {
                 is AppResult.Failure -> {
                     _uiState.update { it.copy(errorMessage = result.error.toUserMessage()) }
                 }

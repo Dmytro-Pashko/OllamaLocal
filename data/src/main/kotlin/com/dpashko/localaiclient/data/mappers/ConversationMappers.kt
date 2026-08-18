@@ -9,6 +9,7 @@ fun ConversationListItemEntity.toDomain(): Conversation =
     Conversation(
         id = id,
         title = title,
+        isPinned = isPinned,
         modelName = modelName,
         createdAtMillis = createdAtMillis,
         updatedAtMillis = updatedAtMillis,

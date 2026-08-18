@@ -13,6 +13,8 @@ data class ConversationEntity(
     val id: Long = 0L,
     /** Display title shown in the conversation list. */
     val title: String,
+    /** True when the conversation should be shown above regular conversations. */
+    val isPinned: Boolean = false,
     /** Model selected for this conversation. */
     val modelName: String,
     /** Creation timestamp in epoch milliseconds. */

@@ -8,6 +8,8 @@ data class Conversation(
     val id: Long,
     /** User-facing title, currently derived from the conversation content or model. */
     val title: String,
+    /** Whether this conversation should be shown above regular conversations. */
+    val isPinned: Boolean,
     /** Model selected when the conversation was created. */
     val modelName: String,
     /** Creation timestamp in epoch milliseconds. */

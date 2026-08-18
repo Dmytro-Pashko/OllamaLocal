@@ -25,6 +25,7 @@ object DatabaseModule {
             name = "local_ai_client.db",
         )
             .addMigrations(LocalAiClientDatabase.MIGRATION_1_2)
+            .addMigrations(LocalAiClientDatabase.MIGRATION_2_3)
             .build()
 
     @Provides

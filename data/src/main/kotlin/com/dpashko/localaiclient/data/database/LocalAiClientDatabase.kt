@@ -16,7 +16,7 @@ import com.dpashko.localaiclient.data.models.local.MessageEntity
         ConversationEntity::class,
         MessageEntity::class,
     ],
-    version = 2,
+    version = 3,
     exportSchema = false,
 )
 abstract class LocalAiClientDatabase : RoomDatabase() {
@@ -33,6 +33,15 @@ abstract class LocalAiClientDatabase : RoomDatabase() {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE messages ADD COLUMN status TEXT NOT NULL DEFAULT 'SENT'")
                 db.execSQL("ALTER TABLE messages ADD COLUMN errorMessage TEXT")
+            }
+        }
+
+        /**
+         * Adds a local pin flag for favorite conversations.
+         */
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE conversations ADD COLUMN isPinned INTEGER NOT NULL DEFAULT 0")
             }
         }
     }

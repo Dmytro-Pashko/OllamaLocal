@@ -52,6 +52,7 @@ class ConversationRepositoryImpl @Inject constructor(
             conversationDao.insertConversation(
                 ConversationEntity(
                     title = "New conversation",
+                    isPinned = false,
                     modelName = modelName,
                     createdAtMillis = now,
                     updatedAtMillis = now,
@@ -69,6 +70,20 @@ class ConversationRepositoryImpl @Inject constructor(
             database.withTransaction {
                 conversationDao.deleteAllMessages()
                 conversationDao.deleteAllConversations()
+            }
+        }
+
+    override suspend fun setConversationPinned(
+        conversationId: Long,
+        isPinned: Boolean,
+    ): AppResult<Unit> =
+        safeDatabaseCall {
+            val updatedRows = conversationDao.updateConversationPinned(
+                conversationId = conversationId,
+                isPinned = isPinned,
+            )
+            if (updatedRows == 0) {
+                throw IllegalStateException("Conversation cannot be updated.")
             }
         }
 

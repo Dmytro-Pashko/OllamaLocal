@@ -22,6 +22,7 @@ interface ConversationDao {
         SELECT
             conversations.id,
             conversations.title,
+            conversations.isPinned,
             conversations.modelName,
             conversations.createdAtMillis,
             conversations.updatedAtMillis,
@@ -32,7 +33,7 @@ interface ConversationDao {
                     AND messages.status = 'GENERATING'
             ) AS hasGeneratingMessage
         FROM conversations
-        ORDER BY conversations.updatedAtMillis DESC
+        ORDER BY conversations.isPinned DESC, conversations.updatedAtMillis DESC
         """,
     )
     fun observeConversations(): Flow<List<ConversationListItemEntity>>
@@ -45,6 +46,7 @@ interface ConversationDao {
         SELECT
             conversations.id,
             conversations.title,
+            conversations.isPinned,
             conversations.modelName,
             conversations.createdAtMillis,
             conversations.updatedAtMillis,
@@ -63,7 +65,7 @@ interface ConversationDao {
                 WHERE messages.conversationId = conversations.id
                     AND messages.content LIKE '%' || :query || '%'
             )
-        ORDER BY conversations.updatedAtMillis DESC
+        ORDER BY conversations.isPinned DESC, conversations.updatedAtMillis DESC
         """,
     )
     fun observeConversations(query: String): Flow<List<ConversationListItemEntity>>
@@ -175,6 +177,15 @@ interface ConversationDao {
         conversationId: Long,
         updatedAtMillis: Long,
     )
+
+    /**
+     * Updates the local favorite pin flag for a conversation.
+     */
+    @Query("UPDATE conversations SET isPinned = :isPinned WHERE id = :conversationId")
+    suspend fun updateConversationPinned(
+        conversationId: Long,
+        isPinned: Boolean,
+    ): Int
 
     /**
      * Completes a generating assistant placeholder and returns the affected row count.

@@ -55,6 +55,14 @@ interface ConversationRepository {
     suspend fun deleteAllSessionData(): AppResult<Unit>
 
     /**
+     * Updates whether a conversation should be shown above regular conversations.
+     */
+    suspend fun setConversationPinned(
+        conversationId: Long,
+        isPinned: Boolean,
+    ): AppResult<Unit>
+
+    /**
      * Adds a user message to [conversationId] and returns the inserted message id.
      */
     suspend fun addUserMessage(

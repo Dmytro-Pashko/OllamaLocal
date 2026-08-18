@@ -76,6 +76,7 @@ fun ConversationListRoute(
         onSearchQueryChanged = viewModel::onSearchQueryChanged,
         onCreateConversation = viewModel::createConversation,
         onDeleteConversation = viewModel::deleteConversation,
+        onSetConversationPinned = viewModel::setConversationPinned,
         onOpenConversation = { conversation ->
             onOpenConversation(
                 state.provider,
@@ -97,6 +98,7 @@ private fun ConversationListScreen(
     onSearchQueryChanged: (String) -> Unit,
     onCreateConversation: () -> Unit,
     onDeleteConversation: (Long) -> Unit,
+    onSetConversationPinned: (Long, Boolean) -> Unit,
     onOpenConversation: (ConversationUi) -> Unit,
 ) {
     var pendingDeleteConversation by remember { mutableStateOf<ConversationUi?>(null) }
@@ -196,11 +198,14 @@ private fun ConversationListScreen(
                             items = state.conversations,
                             key = { it.id },
                         ) { conversation ->
-                            SwipeConversationItem(
-                                conversation = conversation,
-                                onDeleteRequest = { pendingDeleteConversation = conversation },
-                                onOpen = { onOpenConversation(conversation) },
-                            )
+                        SwipeConversationItem(
+                            conversation = conversation,
+                            onDeleteRequest = { pendingDeleteConversation = conversation },
+                            onTogglePinned = {
+                                onSetConversationPinned(conversation.id, !conversation.isPinned)
+                            },
+                            onOpen = { onOpenConversation(conversation) },
+                        )
                         }
                     }
                 }
@@ -224,6 +229,7 @@ private fun ConversationListScreen(
 private fun SwipeConversationItem(
     conversation: ConversationUi,
     onDeleteRequest: () -> Unit,
+    onTogglePinned: () -> Unit,
     onOpen: () -> Unit,
 ) {
     val dismissState = rememberSwipeToDismissBoxState(
@@ -265,8 +271,16 @@ private fun SwipeConversationItem(
                     Text("${conversation.modelName} • ${conversation.updatedAtText}")
                 },
                 trailingContent = {
-                    if (conversation.hasGeneratingMessage) {
-                        CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        TextButton(onClick = onTogglePinned) {
+                            Text(if (conversation.isPinned) "Unpin" else "Pin")
+                        }
+                        if (conversation.hasGeneratingMessage) {
+                            CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                        }
                     }
                 },
             )
