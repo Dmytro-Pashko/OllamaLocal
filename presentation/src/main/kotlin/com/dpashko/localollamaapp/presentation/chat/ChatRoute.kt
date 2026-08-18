@@ -1,6 +1,8 @@
 package com.dpashko.localollamaapp.presentation.chat
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,17 +16,21 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -32,16 +38,21 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.dpashko.localollamaapp.domain.models.conversation.MessageRole
 import com.dpashko.localollamaapp.domain.models.conversation.MessageStatus
 import com.dpashko.localollamaapp.presentation.ui.models.MessageUi
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 @Composable
 fun ChatRoute(
@@ -69,8 +80,12 @@ private fun ChatScreen(
     onRetryClick: (Long) -> Unit,
 ) {
     val listState = rememberLazyListState()
+    val clipboardManager = LocalClipboardManager.current
+    val snackbarHostState = remember { SnackbarHostState() }
+    val coroutineScope = rememberCoroutineScope()
     val hasGeneratingMessage = state.messages.any { it.status == MessageStatus.GENERATING }
     var nowMillis by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    var actionMessage by remember { mutableStateOf<MessageUi?>(null) }
 
     LaunchedEffect(state.messages.size) {
         if (state.messages.isNotEmpty()) {
@@ -87,6 +102,7 @@ private fun ChatScreen(
     }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = {
@@ -147,6 +163,16 @@ private fun ChatScreen(
                             message = message,
                             isActionEnabled = !state.isSending && !state.hasGeneratingMessage,
                             nowMillis = nowMillis,
+                            isActionsMenuExpanded = actionMessage?.id == message.id,
+                            onMessageLongPress = { actionMessage = message },
+                            onDismissActionsMenu = { actionMessage = null },
+                            onCopyClick = {
+                                clipboardManager.setText(AnnotatedString(message.displayText(nowMillis)))
+                                actionMessage = null
+                                coroutineScope.launch {
+                                    snackbarHostState.showSnackbar("Message copied")
+                                }
+                            },
                             onRetryClick = onRetryClick,
                         )
                     }
@@ -167,19 +193,20 @@ private fun ChatScreen(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun MessageBubble(
     message: MessageUi,
     isActionEnabled: Boolean,
     nowMillis: Long,
+    isActionsMenuExpanded: Boolean,
+    onMessageLongPress: () -> Unit,
+    onDismissActionsMenu: () -> Unit,
+    onCopyClick: () -> Unit,
     onRetryClick: (Long) -> Unit,
 ) {
     val isUser = message.role == MessageRole.USER
-    val bubbleText = when (message.status) {
-        MessageStatus.GENERATING -> "Generating... ${formatElapsedTime(nowMillis - message.createdAtMillis)}"
-        MessageStatus.FAILED -> message.errorMessage ?: "Generation failed."
-        MessageStatus.SENT -> message.content
-    }
+    val bubbleText = message.displayText(nowMillis)
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start,
@@ -187,6 +214,10 @@ private fun MessageBubble(
         Column(
             modifier = Modifier
                 .widthIn(max = 320.dp)
+                .combinedClickable(
+                    onClick = {},
+                    onLongClick = onMessageLongPress,
+                )
                 .background(
                     color = if (isUser) {
                         MaterialTheme.colorScheme.primaryContainer
@@ -235,9 +266,25 @@ private fun MessageBubble(
                     Text("Retry")
                 }
             }
+            DropdownMenu(
+                expanded = isActionsMenuExpanded,
+                onDismissRequest = onDismissActionsMenu,
+            ) {
+                DropdownMenuItem(
+                    text = { Text("Copy") },
+                    onClick = onCopyClick,
+                )
+            }
         }
     }
 }
+
+private fun MessageUi.displayText(nowMillis: Long): String =
+    when (status) {
+        MessageStatus.GENERATING -> "Generating... ${formatElapsedTime(nowMillis - createdAtMillis)}"
+        MessageStatus.FAILED -> content.ifBlank { errorMessage ?: "Generation failed." }
+        MessageStatus.SENT -> content
+    }
 
 private fun formatElapsedTime(elapsedMillis: Long): String {
     val totalSeconds = (elapsedMillis.coerceAtLeast(0L) / 1_000).toInt()
