@@ -123,6 +123,12 @@ private fun ConnectionScreen(
                 style = MaterialTheme.typography.headlineMedium,
             )
 
+            Text(
+                text = state.providerHealth.displayText,
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.primary,
+            )
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),

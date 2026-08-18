@@ -3,6 +3,7 @@ package com.dpashko.localaiclient.presentation.connection
 import com.dpashko.localaiclient.domain.models.connection.AiProvider
 import com.dpashko.localaiclient.domain.models.connection.ConnectionConfig
 import com.dpashko.localaiclient.domain.models.connection.ConnectionPreset
+import com.dpashko.localaiclient.domain.models.connection.ProviderHealth
 import com.dpashko.localaiclient.presentation.ui.models.AiModelUi
 
 /**
@@ -21,6 +22,8 @@ data class ConnectionUiState(
     val isRefreshingModels: Boolean = false,
     /** True after a successful connection and non-empty model list. */
     val isConnected: Boolean = false,
+    /** Reachability status for the current provider config. */
+    val providerHealth: ProviderHealth = ProviderHealth.NOT_CHECKED,
     /** Models returned by the connected provider. */
     val models: List<AiModelUi> = emptyList(),
     /** Currently selected model name, if a model is available. */

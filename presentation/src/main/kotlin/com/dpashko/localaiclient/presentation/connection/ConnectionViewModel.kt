@@ -7,6 +7,7 @@ import com.dpashko.localaiclient.domain.models.connection.AiProvider
 import com.dpashko.localaiclient.domain.models.connection.ConnectionConfig
 import com.dpashko.localaiclient.domain.models.connection.ConnectionPreset
 import com.dpashko.localaiclient.domain.models.connection.LastConnection
+import com.dpashko.localaiclient.domain.models.connection.ProviderHealth
 import com.dpashko.localaiclient.domain.models.error.AppError
 import com.dpashko.localaiclient.domain.usecases.ApplyConnectionPresetUseCase
 import com.dpashko.localaiclient.domain.usecases.ConnectToProviderUseCase
@@ -80,6 +81,7 @@ class ConnectionViewModel @Inject constructor(
                 selectedPresetId = null,
                 isConnected = false,
                 isRefreshingModels = false,
+                providerHealth = ProviderHealth.NOT_CHECKED,
                 models = emptyList(),
                 selectedModelName = null,
                 errorMessage = null,
@@ -98,6 +100,7 @@ class ConnectionViewModel @Inject constructor(
                 selectedPresetId = null,
                 isConnected = false,
                 isRefreshingModels = false,
+                providerHealth = ProviderHealth.NOT_CHECKED,
                 models = emptyList(),
                 selectedModelName = null,
                 errorMessage = null,
@@ -115,6 +118,7 @@ class ConnectionViewModel @Inject constructor(
                 selectedPresetId = null,
                 isConnected = false,
                 isRefreshingModels = false,
+                providerHealth = ProviderHealth.NOT_CHECKED,
                 models = emptyList(),
                 selectedModelName = null,
                 errorMessage = null,
@@ -150,6 +154,7 @@ class ConnectionViewModel @Inject constructor(
                         selectedPresetId = appliedPreset.id,
                         isConnected = false,
                         isRefreshingModels = false,
+                        providerHealth = ProviderHealth.NOT_CHECKED,
                         models = emptyList(),
                         errorMessage = null,
                     )
@@ -237,6 +242,7 @@ class ConnectionViewModel @Inject constructor(
                 it.copy(
                     isConnecting = true,
                     isRefreshingModels = false,
+                    providerHealth = ProviderHealth.CHECKING,
                     isConnected = false,
                     models = emptyList(),
                     errorMessage = null,
@@ -248,6 +254,7 @@ class ConnectionViewModel @Inject constructor(
                     _uiState.update {
                         it.copy(
                             isConnecting = false,
+                            providerHealth = connectionResult.error.toProviderHealth(),
                             errorMessage = connectionResult.error.toUserMessage(),
                         )
                     }
@@ -281,6 +288,7 @@ class ConnectionViewModel @Inject constructor(
             _uiState.update {
                 it.copy(
                     isRefreshingModels = true,
+                    providerHealth = ProviderHealth.CHECKING,
                     errorMessage = null,
                 )
             }
@@ -307,6 +315,7 @@ class ConnectionViewModel @Inject constructor(
                         isConnecting = false,
                         isRefreshingModels = false,
                         isConnected = if (preserveExistingModelsOnFailure) it.isConnected else false,
+                        providerHealth = modelsResult.error.toProviderHealth(),
                         errorMessage = modelsResult.error.toUserMessage(),
                     )
                 }
@@ -322,6 +331,7 @@ class ConnectionViewModel @Inject constructor(
                         isConnecting = false,
                         isRefreshingModels = false,
                         isConnected = true,
+                        providerHealth = ProviderHealth.REACHABLE,
                         models = models,
                         selectedModelName = selectedModelName,
                     )
@@ -353,4 +363,10 @@ class ConnectionViewModel @Inject constructor(
             port = port,
         )
     }
+
+    private fun AppError.toProviderHealth(): ProviderHealth =
+        when (this) {
+            AppError.Timeout -> ProviderHealth.TIMEOUT
+            else -> ProviderHealth.OFFLINE
+        }
 }
