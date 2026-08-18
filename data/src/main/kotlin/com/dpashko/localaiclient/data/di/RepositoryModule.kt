@@ -5,12 +5,14 @@ import com.dpashko.localaiclient.data.repositories.AiProviderRepositoryImpl
 import com.dpashko.localaiclient.data.repositories.ConnectionPresetRepositoryImpl
 import com.dpashko.localaiclient.data.repositories.ConversationRepositoryImpl
 import com.dpashko.localaiclient.data.repositories.GenerationSettingsRepositoryImpl
+import com.dpashko.localaiclient.data.repositories.LastConnectionRepositoryImpl
 import com.dpashko.localaiclient.data.repositories.SecuritySettingsRepositoryImpl
 import com.dpashko.localaiclient.domain.repositories.ChatGenerationScheduler
 import com.dpashko.localaiclient.domain.repositories.ConnectionPresetRepository
 import com.dpashko.localaiclient.domain.repositories.ConversationRepository
 import com.dpashko.localaiclient.domain.repositories.AiProviderRepository
 import com.dpashko.localaiclient.domain.repositories.GenerationSettingsRepository
+import com.dpashko.localaiclient.domain.repositories.LastConnectionRepository
 import com.dpashko.localaiclient.domain.repositories.SecuritySettingsRepository
 import dagger.Binds
 import dagger.Module
@@ -50,6 +52,15 @@ abstract class RepositoryModule {
     abstract fun bindConnectionPresetRepository(
         repository: ConnectionPresetRepositoryImpl,
     ): ConnectionPresetRepository
+
+    /**
+     * Binds last successful connection storage to the domain connection contract.
+     */
+    @Binds
+    @Singleton
+    abstract fun bindLastConnectionRepository(
+        repository: LastConnectionRepositoryImpl,
+    ): LastConnectionRepository
 
     /**
      * Binds generation settings persistence to the domain settings contract.

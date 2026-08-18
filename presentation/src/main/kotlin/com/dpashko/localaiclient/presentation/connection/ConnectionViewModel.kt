@@ -6,19 +6,23 @@ import com.dpashko.localaiclient.domain.models.common.AppResult
 import com.dpashko.localaiclient.domain.models.connection.AiProvider
 import com.dpashko.localaiclient.domain.models.connection.ConnectionConfig
 import com.dpashko.localaiclient.domain.models.connection.ConnectionPreset
+import com.dpashko.localaiclient.domain.models.connection.LastConnection
 import com.dpashko.localaiclient.domain.models.error.AppError
 import com.dpashko.localaiclient.domain.usecases.ApplyConnectionPresetUseCase
 import com.dpashko.localaiclient.domain.usecases.ConnectToProviderUseCase
 import com.dpashko.localaiclient.domain.usecases.DeleteConnectionPresetUseCase
 import com.dpashko.localaiclient.domain.usecases.GetAvailableModelsUseCase
 import com.dpashko.localaiclient.domain.usecases.ObserveConnectionPresetsUseCase
+import com.dpashko.localaiclient.domain.usecases.ObserveLastConnectionUseCase
 import com.dpashko.localaiclient.domain.usecases.SaveConnectionPresetUseCase
+import com.dpashko.localaiclient.domain.usecases.SaveLastConnectionUseCase
 import com.dpashko.localaiclient.presentation.common.toUserMessage
 import com.dpashko.localaiclient.presentation.ui.models.toUi
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -31,7 +35,9 @@ class ConnectionViewModel @Inject constructor(
     private val connectToProviderUseCase: ConnectToProviderUseCase,
     private val getAvailableModelsUseCase: GetAvailableModelsUseCase,
     private val observeConnectionPresetsUseCase: ObserveConnectionPresetsUseCase,
+    private val observeLastConnectionUseCase: ObserveLastConnectionUseCase,
     private val saveConnectionPresetUseCase: SaveConnectionPresetUseCase,
+    private val saveLastConnectionUseCase: SaveLastConnectionUseCase,
     private val deleteConnectionPresetUseCase: DeleteConnectionPresetUseCase,
     private val applyConnectionPresetUseCase: ApplyConnectionPresetUseCase,
 ) : ViewModel() {
@@ -42,6 +48,23 @@ class ConnectionViewModel @Inject constructor(
         viewModelScope.launch {
             observeConnectionPresetsUseCase().collect { presets ->
                 _uiState.update { it.copy(presets = presets) }
+            }
+        }
+
+        viewModelScope.launch {
+            observeLastConnectionUseCase().first()?.let { connection ->
+                _uiState.update {
+                    it.copy(
+                        provider = connection.provider,
+                        host = connection.host,
+                        port = connection.port.toString(),
+                        selectedModelName = connection.modelName,
+                        selectedPresetId = null,
+                        isConnected = false,
+                        models = emptyList(),
+                        errorMessage = null,
+                    )
+                }
             }
         }
     }
@@ -234,6 +257,7 @@ class ConnectionViewModel @Inject constructor(
      * Loads models after a successful provider connection.
      */
     private suspend fun loadModels(config: ConnectionConfig) {
+        val preferredModelName = _uiState.value.selectedModelName
         when (val modelsResult = getAvailableModelsUseCase(config)) {
             is AppResult.Failure -> {
                 _uiState.update {
@@ -246,12 +270,26 @@ class ConnectionViewModel @Inject constructor(
 
             is AppResult.Success -> {
                 val models = modelsResult.data.map { it.toUi() }
+                val selectedModelName = preferredModelName
+                    ?.takeIf { modelName -> models.any { it.name == modelName } }
+                    ?: models.firstOrNull()?.name
                 _uiState.update {
                     it.copy(
                         isConnecting = false,
                         isConnected = true,
                         models = models,
-                        selectedModelName = models.firstOrNull()?.name,
+                        selectedModelName = selectedModelName,
+                    )
+                }
+                selectedModelName?.let { modelName ->
+                    saveLastConnectionUseCase(
+                        LastConnection(
+                            provider = config.provider,
+                            host = config.host,
+                            port = config.port,
+                            modelName = modelName,
+                            updatedAtMillis = System.currentTimeMillis(),
+                        ),
                     )
                 }
             }
