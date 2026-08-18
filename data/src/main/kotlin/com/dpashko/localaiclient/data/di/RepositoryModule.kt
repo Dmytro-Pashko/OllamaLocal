@@ -2,10 +2,12 @@ package com.dpashko.localaiclient.data.di
 
 import com.dpashko.localaiclient.data.scheduler.WorkManagerChatGenerationScheduler
 import com.dpashko.localaiclient.data.repositories.AiProviderRepositoryImpl
+import com.dpashko.localaiclient.data.repositories.ConnectionPresetRepositoryImpl
 import com.dpashko.localaiclient.data.repositories.ConversationRepositoryImpl
 import com.dpashko.localaiclient.data.repositories.GenerationSettingsRepositoryImpl
 import com.dpashko.localaiclient.data.repositories.SecuritySettingsRepositoryImpl
 import com.dpashko.localaiclient.domain.repositories.ChatGenerationScheduler
+import com.dpashko.localaiclient.domain.repositories.ConnectionPresetRepository
 import com.dpashko.localaiclient.domain.repositories.ConversationRepository
 import com.dpashko.localaiclient.domain.repositories.AiProviderRepository
 import com.dpashko.localaiclient.domain.repositories.GenerationSettingsRepository
@@ -39,6 +41,15 @@ abstract class RepositoryModule {
     abstract fun bindAiProviderRepository(
         repository: AiProviderRepositoryImpl,
     ): AiProviderRepository
+
+    /**
+     * Binds local connection preset storage to the domain preset contract.
+     */
+    @Binds
+    @Singleton
+    abstract fun bindConnectionPresetRepository(
+        repository: ConnectionPresetRepositoryImpl,
+    ): ConnectionPresetRepository
 
     /**
      * Binds generation settings persistence to the domain settings contract.

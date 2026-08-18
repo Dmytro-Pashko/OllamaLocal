@@ -2,10 +2,12 @@ package com.dpashko.localaiclient.presentation.connection
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
@@ -16,6 +18,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -41,6 +44,9 @@ fun ConnectionRoute(
         onPortChanged = viewModel::onPortChanged,
         onConnectClick = viewModel::connect,
         onModelSelected = viewModel::onModelSelected,
+        onPresetSelected = viewModel::applyPreset,
+        onSavePreset = viewModel::saveCurrentAsPreset,
+        onDeletePreset = viewModel::deletePreset,
         onOpenConversations = {
             val port = state.port.toIntOrNull() ?: return@ConnectionScreen
             val modelName = state.selectedModelName ?: return@ConnectionScreen
@@ -58,10 +64,49 @@ private fun ConnectionScreen(
     onPortChanged: (String) -> Unit,
     onConnectClick: () -> Unit,
     onModelSelected: (String) -> Unit,
+    onPresetSelected: (String) -> Unit,
+    onSavePreset: (String) -> Unit,
+    onDeletePreset: (String) -> Unit,
     onOpenConversations: () -> Unit,
 ) {
     var isProviderMenuExpanded by remember { mutableStateOf(false) }
     var isModelMenuExpanded by remember { mutableStateOf(false) }
+    var isPresetMenuExpanded by remember { mutableStateOf(false) }
+    var isSavePresetDialogVisible by remember { mutableStateOf(false) }
+    var presetNameText by remember { mutableStateOf("") }
+    val selectedPreset = state.presets.firstOrNull { it.id == state.selectedPresetId }
+
+    if (isSavePresetDialogVisible) {
+        AlertDialog(
+            onDismissRequest = { isSavePresetDialogVisible = false },
+            title = { Text("Save preset") },
+            text = {
+                OutlinedTextField(
+                    modifier = Modifier.fillMaxWidth(),
+                    value = presetNameText,
+                    onValueChange = { presetNameText = it },
+                    label = { Text("Name") },
+                    singleLine = true,
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        isSavePresetDialogVisible = false
+                        onSavePreset(presetNameText)
+                    },
+                    enabled = presetNameText.isNotBlank(),
+                ) {
+                    Text("Save")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { isSavePresetDialogVisible = false }) {
+                    Text("Cancel")
+                }
+            },
+        )
+    }
 
     Scaffold { innerPadding ->
         Column(
@@ -75,6 +120,67 @@ private fun ConnectionScreen(
                 text = "Local AI Client",
                 style = MaterialTheme.typography.headlineMedium,
             )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                ExposedDropdownMenuBox(
+                    modifier = Modifier.weight(1f),
+                    expanded = isPresetMenuExpanded,
+                    onExpandedChange = {
+                        if (!state.isConnecting && state.presets.isNotEmpty()) {
+                            isPresetMenuExpanded = !isPresetMenuExpanded
+                        }
+                    },
+                ) {
+                    OutlinedTextField(
+                        modifier = Modifier
+                            .menuAnchor()
+                            .fillMaxWidth(),
+                        value = selectedPreset?.name.orEmpty(),
+                        onValueChange = {},
+                        readOnly = true,
+                        enabled = !state.isConnecting && state.presets.isNotEmpty(),
+                        label = { Text("Presets") },
+                        trailingIcon = {
+                            ExposedDropdownMenuDefaults.TrailingIcon(expanded = isPresetMenuExpanded)
+                        },
+                    )
+
+                    ExposedDropdownMenu(
+                        expanded = isPresetMenuExpanded,
+                        onDismissRequest = { isPresetMenuExpanded = false },
+                    ) {
+                        state.presets.forEach { preset ->
+                            DropdownMenuItem(
+                                text = {
+                                    Column {
+                                        Text(preset.name)
+                                        Text(
+                                            text = "${preset.provider.displayName} ${preset.host}:${preset.port}",
+                                            style = MaterialTheme.typography.bodySmall,
+                                        )
+                                    }
+                                },
+                                onClick = {
+                                    onPresetSelected(preset.id)
+                                    isPresetMenuExpanded = false
+                                },
+                            )
+                        }
+                    }
+                }
+
+                TextButton(
+                    onClick = {
+                        state.selectedPresetId?.let(onDeletePreset)
+                    },
+                    enabled = !state.isConnecting && state.selectedPresetId != null,
+                ) {
+                    Text("Delete")
+                }
+            }
 
             ExposedDropdownMenuBox(
                 expanded = isProviderMenuExpanded,
@@ -143,6 +249,17 @@ private fun ConnectionScreen(
                 } else {
                     Text("Connect")
                 }
+            }
+
+            TextButton(
+                modifier = Modifier.fillMaxWidth(),
+                onClick = {
+                    presetNameText = selectedPreset?.name ?: "${state.provider.displayName} ${state.host}"
+                    isSavePresetDialogVisible = true
+                },
+                enabled = !state.isConnecting && state.canSavePreset,
+            ) {
+                Text("Save preset")
             }
 
             ExposedDropdownMenuBox(
