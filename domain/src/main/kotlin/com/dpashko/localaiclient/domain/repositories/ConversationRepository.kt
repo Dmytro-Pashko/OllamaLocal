@@ -2,6 +2,7 @@ package com.dpashko.localaiclient.domain.repositories
 
 import com.dpashko.localaiclient.domain.models.common.AppResult
 import com.dpashko.localaiclient.domain.models.conversation.Conversation
+import com.dpashko.localaiclient.domain.models.conversation.ConversationSettings
 import com.dpashko.localaiclient.domain.models.conversation.Message
 import kotlinx.coroutines.flow.Flow
 
@@ -38,6 +39,16 @@ interface ConversationRepository {
     fun observeHasGeneratingMessage(conversationId: Long): Flow<Boolean>
 
     /**
+     * Observes generation settings stored for one conversation.
+     */
+    fun observeConversationSettings(conversationId: Long): Flow<ConversationSettings?>
+
+    /**
+     * Returns generation settings stored for one conversation.
+     */
+    suspend fun getConversationSettings(conversationId: Long): AppResult<ConversationSettings>
+
+    /**
      * Returns sent, non-empty messages that should be sent as provider context.
      */
     suspend fun getContextMessages(conversationId: Long): AppResult<List<Message>>
@@ -50,7 +61,10 @@ interface ConversationRepository {
     /**
      * Creates a new conversation for [modelName] and returns its local id.
      */
-    suspend fun createConversation(modelName: String): AppResult<Long>
+    suspend fun createConversation(
+        modelName: String,
+        generationTimeoutMillis: Long,
+    ): AppResult<Long>
 
     /**
      * Deletes a conversation and its messages from local storage.
@@ -77,6 +91,11 @@ interface ConversationRepository {
         conversationId: Long,
         isArchived: Boolean,
     ): AppResult<Unit>
+
+    /**
+     * Updates model, timeout, and system prompt for one conversation.
+     */
+    suspend fun saveConversationSettings(settings: ConversationSettings): AppResult<Unit>
 
     /**
      * Manually renames a conversation and protects it from auto-title updates.

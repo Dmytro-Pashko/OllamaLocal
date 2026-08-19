@@ -11,25 +11,23 @@ import com.dpashko.localaiclient.domain.models.common.AppResult
 import com.dpashko.localaiclient.domain.models.connection.ConnectionConfig
 import com.dpashko.localaiclient.domain.models.error.AppError
 import com.dpashko.localaiclient.domain.repositories.ChatGenerationScheduler
-import com.dpashko.localaiclient.domain.repositories.GenerationSettingsRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.flow.first
 
 class WorkManagerChatGenerationScheduler @Inject constructor(
     @param:ApplicationContext private val context: Context,
-    private val generationSettingsRepository: GenerationSettingsRepository,
 ) : ChatGenerationScheduler {
     override suspend fun enqueueGeneration(
         config: ConnectionConfig,
         conversationId: Long,
         assistantMessageId: Long,
         modelName: String,
+        generationTimeoutMillis: Long,
+        systemPrompt: String,
         replaceExisting: Boolean,
     ): AppResult<Unit> =
         try {
-            val generationSettings = generationSettingsRepository.observeGenerationSettings().first()
             val request = OneTimeWorkRequestBuilder<GenerateAssistantMessageWorker>()
                 .setInputData(
                     workDataOf(
@@ -39,8 +37,8 @@ class WorkManagerChatGenerationScheduler @Inject constructor(
                         GenerateAssistantMessageWorker.KEY_CONVERSATION_ID to conversationId,
                         GenerateAssistantMessageWorker.KEY_ASSISTANT_MESSAGE_ID to assistantMessageId,
                         GenerateAssistantMessageWorker.KEY_MODEL_NAME to modelName,
-                        GenerateAssistantMessageWorker.KEY_GENERATION_TIMEOUT_MILLIS to
-                            generationSettings.generationTimeoutMillis,
+                        GenerateAssistantMessageWorker.KEY_GENERATION_TIMEOUT_MILLIS to generationTimeoutMillis,
+                        GenerateAssistantMessageWorker.KEY_SYSTEM_PROMPT to systemPrompt,
                     ),
                 )
                 .build()

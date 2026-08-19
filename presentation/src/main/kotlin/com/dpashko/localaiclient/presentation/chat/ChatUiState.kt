@@ -15,6 +15,10 @@ data class ChatUiState(
     val port: Int = AiProvider.OLLAMA.defaultPort,
     /** Selected model name for this conversation. */
     val modelName: String = "",
+    /** Timeout stored for this conversation, shown in minutes. */
+    val generationTimeoutMinutes: Int = 60,
+    /** Optional system prompt stored for this conversation. */
+    val systemPrompt: String = "",
     /** Local conversation id displayed by the screen. */
     val conversationId: Long = 0L,
     /** Messages rendered in the chat timeline. */

@@ -7,10 +7,13 @@ import androidx.lifecycle.viewModelScope
 import com.dpashko.localaiclient.domain.models.common.AppResult
 import com.dpashko.localaiclient.domain.models.connection.AiProvider
 import com.dpashko.localaiclient.domain.models.connection.ConnectionConfig
+import com.dpashko.localaiclient.domain.models.conversation.ConversationSettings
 import com.dpashko.localaiclient.domain.usecases.EditMessageAndRegenerateUseCase
+import com.dpashko.localaiclient.domain.usecases.ObserveConversationSettingsUseCase
 import com.dpashko.localaiclient.domain.usecases.ObserveHasGeneratingMessageUseCase
 import com.dpashko.localaiclient.domain.usecases.ObserveMessagesUseCase
 import com.dpashko.localaiclient.domain.usecases.RetryGenerationUseCase
+import com.dpashko.localaiclient.domain.usecases.SaveConversationSettingsUseCase
 import com.dpashko.localaiclient.domain.usecases.SendMessageUseCase
 import com.dpashko.localaiclient.domain.usecases.StopGenerationUseCase
 import com.dpashko.localaiclient.presentation.Routes
@@ -32,10 +35,12 @@ class ChatViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val observeMessagesUseCase: ObserveMessagesUseCase,
     private val observeHasGeneratingMessageUseCase: ObserveHasGeneratingMessageUseCase,
+    private val observeConversationSettingsUseCase: ObserveConversationSettingsUseCase,
     private val sendMessageUseCase: SendMessageUseCase,
     private val retryGenerationUseCase: RetryGenerationUseCase,
     private val editMessageAndRegenerateUseCase: EditMessageAndRegenerateUseCase,
     private val stopGenerationUseCase: StopGenerationUseCase,
+    private val saveConversationSettingsUseCase: SaveConversationSettingsUseCase,
 ) : ViewModel() {
     private val provider = AiProvider.fromRouteValue(savedStateHandle[Routes.ArgProvider])
     private val host = Uri.decode(savedStateHandle[Routes.ArgHost] ?: "")
@@ -70,6 +75,19 @@ class ChatViewModel @Inject constructor(
             observeHasGeneratingMessageUseCase(conversationId).collect { hasGeneratingMessage ->
                 _uiState.update {
                     it.copy(hasGeneratingMessage = hasGeneratingMessage)
+                }
+            }
+        }
+
+        viewModelScope.launch {
+            observeConversationSettingsUseCase(conversationId).collect { settings ->
+                settings ?: return@collect
+                _uiState.update {
+                    it.copy(
+                        modelName = settings.modelName,
+                        generationTimeoutMinutes = settings.generationTimeoutMinutes,
+                        systemPrompt = settings.systemPrompt,
+                    )
                 }
             }
         }
@@ -128,6 +146,42 @@ class ChatViewModel @Inject constructor(
                         it.currentSearchMatchIndex - 1 + it.searchMatchMessageIds.size
                         ) % it.searchMatchMessageIds.size,
                 )
+            }
+        }
+    }
+
+    /**
+     * Saves generation settings for this conversation.
+     */
+    fun saveConversationSettings(
+        modelName: String,
+        timeoutMinutes: String,
+        systemPrompt: String,
+    ) {
+        val minutes = timeoutMinutes.toIntOrNull()
+        if (minutes == null) {
+            _uiState.update { it.copy(errorMessage = "Enter a timeout from 1 to 1440 minutes.") }
+            return
+        }
+
+        viewModelScope.launch {
+            when (
+                val result = saveConversationSettingsUseCase(
+                    ConversationSettings.fromMinutes(
+                        conversationId = conversationId,
+                        modelName = modelName,
+                        minutes = minutes,
+                        systemPrompt = systemPrompt,
+                    ),
+                )
+            ) {
+                is AppResult.Failure -> {
+                    _uiState.update { it.copy(errorMessage = result.error.toUserMessage()) }
+                }
+
+                is AppResult.Success -> {
+                    _uiState.update { it.copy(errorMessage = null) }
+                }
             }
         }
     }

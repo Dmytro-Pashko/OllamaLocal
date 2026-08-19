@@ -8,6 +8,7 @@ import com.dpashko.localaiclient.data.models.local.ConversationEntity
 import com.dpashko.localaiclient.data.models.local.MessageEntity
 import com.dpashko.localaiclient.domain.models.common.AppResult
 import com.dpashko.localaiclient.domain.models.conversation.Conversation
+import com.dpashko.localaiclient.domain.models.conversation.ConversationSettings
 import com.dpashko.localaiclient.domain.models.conversation.Message
 import com.dpashko.localaiclient.domain.models.conversation.MessageRole
 import com.dpashko.localaiclient.domain.models.conversation.MessageStatus
@@ -45,6 +46,16 @@ class ConversationRepositoryImpl @Inject constructor(
     override fun observeHasGeneratingMessage(conversationId: Long): Flow<Boolean> =
         conversationDao.observeHasGeneratingMessage(conversationId)
 
+    override fun observeConversationSettings(conversationId: Long): Flow<ConversationSettings?> =
+        conversationDao.observeConversationSettings(conversationId)
+            .map { settings -> settings?.toDomain() }
+
+    override suspend fun getConversationSettings(conversationId: Long): AppResult<ConversationSettings> =
+        safeDatabaseCall {
+            conversationDao.getConversationSettings(conversationId)?.toDomain()
+                ?: throw IllegalStateException("Conversation settings cannot be loaded.")
+        }
+
     override suspend fun getContextMessages(conversationId: Long): AppResult<List<Message>> =
         safeDatabaseCall {
             conversationDao.getContextMessages(conversationId).map { it.toDomain() }
@@ -55,7 +66,10 @@ class ConversationRepositoryImpl @Inject constructor(
             conversationDao.messageExists(messageId)
         }
 
-    override suspend fun createConversation(modelName: String): AppResult<Long> =
+    override suspend fun createConversation(
+        modelName: String,
+        generationTimeoutMillis: Long,
+    ): AppResult<Long> =
         safeDatabaseCall {
             val now = System.currentTimeMillis()
             conversationDao.insertConversation(
@@ -66,6 +80,8 @@ class ConversationRepositoryImpl @Inject constructor(
                     isArchived = false,
                     archivedAtMillis = null,
                     modelName = modelName,
+                    generationTimeoutMillis = generationTimeoutMillis,
+                    systemPrompt = "",
                     createdAtMillis = now,
                     updatedAtMillis = now,
                 ),
@@ -113,6 +129,20 @@ class ConversationRepositoryImpl @Inject constructor(
             )
             if (updatedRows == 0) {
                 throw IllegalStateException("Conversation cannot be archived.")
+            }
+        }
+
+    override suspend fun saveConversationSettings(settings: ConversationSettings): AppResult<Unit> =
+        safeDatabaseCall {
+            val updatedRows = conversationDao.updateConversationSettings(
+                conversationId = settings.conversationId,
+                modelName = settings.modelName,
+                generationTimeoutMillis = settings.generationTimeoutMillis,
+                systemPrompt = settings.systemPrompt,
+                updatedAtMillis = System.currentTimeMillis(),
+            )
+            if (updatedRows == 0) {
+                throw IllegalStateException("Conversation settings cannot be saved.")
             }
         }
 

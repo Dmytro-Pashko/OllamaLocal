@@ -1,8 +1,10 @@
 package com.dpashko.localaiclient.data.mappers
 
 import com.dpashko.localaiclient.data.models.local.ConversationListItemEntity
+import com.dpashko.localaiclient.data.models.local.ConversationSettingsEntity
 import com.dpashko.localaiclient.data.models.local.MessageEntity
 import com.dpashko.localaiclient.domain.models.conversation.Conversation
+import com.dpashko.localaiclient.domain.models.conversation.ConversationSettings
 import com.dpashko.localaiclient.domain.models.conversation.Message
 
 fun ConversationListItemEntity.toDomain(): Conversation =
@@ -27,4 +29,12 @@ fun MessageEntity.toDomain(): Message =
         status = status,
         errorMessage = errorMessage,
         createdAtMillis = createdAtMillis,
+    )
+
+fun ConversationSettingsEntity.toDomain(): ConversationSettings =
+    ConversationSettings(
+        conversationId = id,
+        modelName = modelName,
+        generationTimeoutMillis = generationTimeoutMillis,
+        systemPrompt = systemPrompt,
     )

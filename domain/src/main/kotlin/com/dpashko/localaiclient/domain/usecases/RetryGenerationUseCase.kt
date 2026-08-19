@@ -27,12 +27,19 @@ class RetryGenerationUseCase @Inject constructor(
             is AppResult.Success -> Unit
         }
 
+        val settings = when (val settingsResult = conversationRepository.getConversationSettings(conversationId)) {
+            is AppResult.Failure -> return settingsResult
+            is AppResult.Success -> settingsResult.data
+        }
+
         return when (
             val scheduleResult = chatGenerationScheduler.enqueueGeneration(
                 config = config,
                 conversationId = conversationId,
                 assistantMessageId = assistantMessageId,
-                modelName = modelName,
+                modelName = settings.modelName,
+                generationTimeoutMillis = settings.generationTimeoutMillis,
+                systemPrompt = settings.systemPrompt,
                 replaceExisting = true,
             )
         ) {

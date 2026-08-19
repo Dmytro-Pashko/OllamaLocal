@@ -19,6 +19,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -74,6 +75,7 @@ fun ChatRoute(
         onSearchQueryChanged = viewModel::onChatSearchQueryChanged,
         onPreviousSearchMatch = viewModel::moveToPreviousSearchMatch,
         onNextSearchMatch = viewModel::moveToNextSearchMatch,
+        onSaveConversationSettings = viewModel::saveConversationSettings,
     )
 }
 
@@ -91,6 +93,7 @@ private fun ChatScreen(
     onSearchQueryChanged: (String) -> Unit,
     onPreviousSearchMatch: () -> Unit,
     onNextSearchMatch: () -> Unit,
+    onSaveConversationSettings: (String, String, String) -> Unit,
 ) {
     val listState = rememberLazyListState()
     val clipboardManager = LocalClipboardManager.current
@@ -100,6 +103,66 @@ private fun ChatScreen(
     var nowMillis by remember { mutableLongStateOf(System.currentTimeMillis()) }
     var actionMessage by remember { mutableStateOf<MessageUi?>(null) }
     var isSearchMode by remember { mutableStateOf(false) }
+    var isSettingsDialogVisible by remember { mutableStateOf(false) }
+    var settingsModelName by remember { mutableStateOf("") }
+    var settingsTimeoutMinutes by remember { mutableStateOf("") }
+    var settingsSystemPrompt by remember { mutableStateOf("") }
+
+    if (isSettingsDialogVisible) {
+        AlertDialog(
+            onDismissRequest = { isSettingsDialogVisible = false },
+            title = { Text("Conversation settings") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    OutlinedTextField(
+                        modifier = Modifier.fillMaxWidth(),
+                        value = settingsModelName,
+                        onValueChange = { settingsModelName = it },
+                        label = { Text("Model") },
+                        singleLine = true,
+                    )
+                    OutlinedTextField(
+                        modifier = Modifier.fillMaxWidth(),
+                        value = settingsTimeoutMinutes,
+                        onValueChange = { value ->
+                            if (value.all { it.isDigit() }) {
+                                settingsTimeoutMinutes = value
+                            }
+                        },
+                        label = { Text("Timeout minutes") },
+                        singleLine = true,
+                    )
+                    OutlinedTextField(
+                        modifier = Modifier.fillMaxWidth(),
+                        value = settingsSystemPrompt,
+                        onValueChange = { settingsSystemPrompt = it.take(4_000) },
+                        label = { Text("System prompt") },
+                        minLines = 3,
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        onSaveConversationSettings(
+                            settingsModelName,
+                            settingsTimeoutMinutes,
+                            settingsSystemPrompt,
+                        )
+                        isSettingsDialogVisible = false
+                    },
+                    enabled = settingsModelName.isNotBlank() && settingsTimeoutMinutes.isNotBlank(),
+                ) {
+                    Text("Save")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { isSettingsDialogVisible = false }) {
+                    Text("Cancel")
+                }
+            },
+        )
+    }
 
     LaunchedEffect(state.messages.size) {
         if (state.messages.isNotEmpty()) {
@@ -195,6 +258,16 @@ private fun ChatScreen(
                     } else {
                         TextButton(onClick = { isSearchMode = true }) {
                             Text("Search")
+                        }
+                        TextButton(
+                            onClick = {
+                                settingsModelName = state.modelName
+                                settingsTimeoutMinutes = state.generationTimeoutMinutes.toString()
+                                settingsSystemPrompt = state.systemPrompt
+                                isSettingsDialogVisible = true
+                            },
+                        ) {
+                            Text("Settings")
                         }
                     }
                     if (state.hasGeneratingMessage) {

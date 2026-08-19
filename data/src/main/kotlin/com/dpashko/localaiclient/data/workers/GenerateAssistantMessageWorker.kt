@@ -13,6 +13,9 @@ import androidx.work.WorkerParameters
 import com.dpashko.localaiclient.domain.models.common.AppResult
 import com.dpashko.localaiclient.domain.models.connection.AiProvider
 import com.dpashko.localaiclient.domain.models.connection.ConnectionConfig
+import com.dpashko.localaiclient.domain.models.conversation.Message
+import com.dpashko.localaiclient.domain.models.conversation.MessageRole
+import com.dpashko.localaiclient.domain.models.conversation.MessageStatus
 import com.dpashko.localaiclient.domain.models.error.AppError
 import com.dpashko.localaiclient.domain.models.settings.GenerationSettings
 import com.dpashko.localaiclient.domain.repositories.AiProviderRepository
@@ -35,6 +38,7 @@ class GenerateAssistantMessageWorker @AssistedInject constructor(
         val conversationId = inputData.getLong(KEY_CONVERSATION_ID, 0L)
         val assistantMessageId = inputData.getLong(KEY_ASSISTANT_MESSAGE_ID, 0L)
         val modelName = inputData.getString(KEY_MODEL_NAME).orEmpty()
+        val systemPrompt = inputData.getString(KEY_SYSTEM_PROMPT).orEmpty()
         val generationTimeoutMillis = inputData.getLong(
             KEY_GENERATION_TIMEOUT_MILLIS,
             GenerationSettings.DEFAULT_GENERATION_TIMEOUT_MILLIS,
@@ -70,6 +74,7 @@ class GenerateAssistantMessageWorker @AssistedInject constructor(
 
             is AppResult.Success -> result.data
         }
+        val providerMessages = contextMessages.withSystemPrompt(systemPrompt)
 
         val streamedContent = StringBuilder()
         var lastPartialWriteMillis = 0L
@@ -116,7 +121,7 @@ class GenerateAssistantMessageWorker @AssistedInject constructor(
                     port = port,
                 ),
                 modelName = modelName,
-                messages = contextMessages,
+                messages = providerMessages,
                 generationTimeoutMillis = generationTimeoutMillis,
                 onDelta = { delta ->
                     streamedContent.append(delta)
@@ -225,6 +230,25 @@ class GenerateAssistantMessageWorker @AssistedInject constructor(
         )
     }
 
+    private fun List<Message>.withSystemPrompt(systemPrompt: String): List<Message> {
+        val trimmedPrompt = systemPrompt.trim()
+        if (trimmedPrompt.isBlank()) {
+            return this
+        }
+
+        return listOf(
+            Message(
+                id = 0L,
+                conversationId = 0L,
+                role = MessageRole.SYSTEM,
+                content = trimmedPrompt,
+                status = MessageStatus.SENT,
+                errorMessage = null,
+                createdAtMillis = 0L,
+            ),
+        ) + this
+    }
+
     private fun AppError.toWorkerMessage(): String =
         when (this) {
             AppError.EmptyMessage -> "Message is empty."
@@ -247,6 +271,7 @@ class GenerateAssistantMessageWorker @AssistedInject constructor(
         const val KEY_ASSISTANT_MESSAGE_ID = "assistant_message_id"
         const val KEY_MODEL_NAME = "model_name"
         const val KEY_GENERATION_TIMEOUT_MILLIS = "generation_timeout_millis"
+        const val KEY_SYSTEM_PROMPT = "system_prompt"
         private const val PARTIAL_UPDATE_INTERVAL_MILLIS = 250L
         private const val CHANNEL_ID = "local_ai_client_generation"
         private const val NOTIFICATION_ID = 1001

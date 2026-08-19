@@ -24,6 +24,7 @@ fun LmStudioModelDto.toDomain(): AiModel =
 fun Message.toRemoteDto(): OllamaChatMessageDto =
     OllamaChatMessageDto(
         role = when (role) {
+            MessageRole.SYSTEM -> "system"
             MessageRole.USER -> "user"
             MessageRole.ASSISTANT -> "assistant"
         },

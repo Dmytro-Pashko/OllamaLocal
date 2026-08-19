@@ -15,6 +15,8 @@ interface ChatGenerationScheduler {
         conversationId: Long,
         assistantMessageId: Long,
         modelName: String,
+        generationTimeoutMillis: Long,
+        systemPrompt: String,
         replaceExisting: Boolean = false,
     ): AppResult<Unit>
 

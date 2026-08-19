@@ -23,6 +23,10 @@ data class ConversationEntity(
     val archivedAtMillis: Long? = null,
     /** Model selected for this conversation. */
     val modelName: String,
+    /** Maximum generation time for this conversation. */
+    val generationTimeoutMillis: Long,
+    /** Optional system instruction prepended to provider context. */
+    val systemPrompt: String = "",
     /** Creation timestamp in epoch milliseconds. */
     val createdAtMillis: Long,
     /** Last update timestamp in epoch milliseconds. */

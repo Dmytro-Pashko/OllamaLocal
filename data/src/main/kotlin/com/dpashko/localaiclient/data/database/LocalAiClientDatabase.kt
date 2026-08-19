@@ -7,6 +7,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import com.dpashko.localaiclient.data.database.dao.ConversationDao
 import com.dpashko.localaiclient.data.models.local.ConversationEntity
 import com.dpashko.localaiclient.data.models.local.MessageEntity
+import com.dpashko.localaiclient.domain.models.settings.GenerationSettings
 
 /**
  * Room database that stores local conversations and chat messages.
@@ -16,7 +17,7 @@ import com.dpashko.localaiclient.data.models.local.MessageEntity
         ConversationEntity::class,
         MessageEntity::class,
     ],
-    version = 5,
+    version = 6,
     exportSchema = false,
 )
 abstract class LocalAiClientDatabase : RoomDatabase() {
@@ -63,6 +64,19 @@ abstract class LocalAiClientDatabase : RoomDatabase() {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE conversations ADD COLUMN isArchived INTEGER NOT NULL DEFAULT 0")
                 db.execSQL("ALTER TABLE conversations ADD COLUMN archivedAtMillis INTEGER")
+            }
+        }
+
+        /**
+         * Adds generation settings that belong to a single conversation.
+         */
+        val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "ALTER TABLE conversations ADD COLUMN generationTimeoutMillis INTEGER NOT NULL DEFAULT " +
+                        GenerationSettings.DEFAULT_GENERATION_TIMEOUT_MILLIS,
+                )
+                db.execSQL("ALTER TABLE conversations ADD COLUMN systemPrompt TEXT NOT NULL DEFAULT ''")
             }
         }
     }

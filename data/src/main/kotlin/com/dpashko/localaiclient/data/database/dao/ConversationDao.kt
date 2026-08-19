@@ -6,6 +6,7 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import com.dpashko.localaiclient.data.models.local.ConversationEntity
 import com.dpashko.localaiclient.data.models.local.ConversationListItemEntity
+import com.dpashko.localaiclient.data.models.local.ConversationSettingsEntity
 import com.dpashko.localaiclient.data.models.local.MessageEntity
 import kotlinx.coroutines.flow.Flow
 
@@ -98,6 +99,30 @@ interface ConversationDao {
      */
     @Query("SELECT * FROM messages WHERE id = :messageId")
     suspend fun getMessage(messageId: Long): MessageEntity?
+
+    /**
+     * Observes editable generation settings for one conversation.
+     */
+    @Query(
+        """
+        SELECT id, modelName, generationTimeoutMillis, systemPrompt
+        FROM conversations
+        WHERE id = :conversationId
+        """,
+    )
+    fun observeConversationSettings(conversationId: Long): Flow<ConversationSettingsEntity?>
+
+    /**
+     * Returns generation settings for one conversation.
+     */
+    @Query(
+        """
+        SELECT id, modelName, generationTimeoutMillis, systemPrompt
+        FROM conversations
+        WHERE id = :conversationId
+        """,
+    )
+    suspend fun getConversationSettings(conversationId: Long): ConversationSettingsEntity?
 
     /**
      * Returns sent, non-empty messages that are eligible for provider context.
@@ -250,6 +275,27 @@ interface ConversationDao {
         conversationId: Long,
         isArchived: Boolean,
         archivedAtMillis: Long?,
+        updatedAtMillis: Long,
+    ): Int
+
+    /**
+     * Updates model, timeout, and optional system prompt for one conversation.
+     */
+    @Query(
+        """
+        UPDATE conversations
+        SET modelName = :modelName,
+            generationTimeoutMillis = :generationTimeoutMillis,
+            systemPrompt = :systemPrompt,
+            updatedAtMillis = :updatedAtMillis
+        WHERE id = :conversationId
+        """,
+    )
+    suspend fun updateConversationSettings(
+        conversationId: Long,
+        modelName: String,
+        generationTimeoutMillis: Long,
+        systemPrompt: String,
         updatedAtMillis: Long,
     ): Int
 
