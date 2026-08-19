@@ -8,7 +8,9 @@ import com.dpashko.localaiclient.domain.models.common.AppResult
 import com.dpashko.localaiclient.domain.models.connection.AiProvider
 import com.dpashko.localaiclient.domain.models.connection.ConnectionConfig
 import com.dpashko.localaiclient.domain.usecases.DeleteAllSessionDataUseCase
+import com.dpashko.localaiclient.domain.usecases.DetectProviderCapabilitiesUseCase
 import com.dpashko.localaiclient.domain.usecases.ObserveActiveGenerationsUseCase
+import com.dpashko.localaiclient.domain.usecases.ObserveProviderCapabilitiesUseCase
 import com.dpashko.localaiclient.domain.usecases.ObserveProviderDiagnosticsUseCase
 import com.dpashko.localaiclient.domain.usecases.ObserveStoragePrivacyStatsUseCase
 import com.dpashko.localaiclient.domain.usecases.RefreshProviderDiagnosticsUseCase
@@ -32,8 +34,10 @@ class DashboardViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     observeActiveGenerationsUseCase: ObserveActiveGenerationsUseCase,
     observeProviderDiagnosticsUseCase: ObserveProviderDiagnosticsUseCase,
+    observeProviderCapabilitiesUseCase: ObserveProviderCapabilitiesUseCase,
     observeStoragePrivacyStatsUseCase: ObserveStoragePrivacyStatsUseCase,
     private val refreshProviderDiagnosticsUseCase: RefreshProviderDiagnosticsUseCase,
+    private val detectProviderCapabilitiesUseCase: DetectProviderCapabilitiesUseCase,
     private val stopGenerationUseCase: StopGenerationUseCase,
     private val stopAllGenerationsUseCase: StopAllGenerationsUseCase,
     private val deleteAllSessionDataUseCase: DeleteAllSessionDataUseCase,
@@ -79,6 +83,14 @@ class DashboardViewModel @Inject constructor(
         }
 
         viewModelScope.launch {
+            observeProviderCapabilitiesUseCase().collect { capabilities ->
+                _uiState.update {
+                    it.copy(providerCapabilities = capabilities)
+                }
+            }
+        }
+
+        viewModelScope.launch {
             observeStoragePrivacyStatsUseCase().collect { stats ->
                 _uiState.update {
                     it.copy(storagePrivacyStats = stats)
@@ -99,15 +111,12 @@ class DashboardViewModel @Inject constructor(
                     errorMessage = null,
                 )
             }
-            when (
-                val result = refreshProviderDiagnosticsUseCase(
-                    ConnectionConfig(
-                        provider = provider,
-                        host = host,
-                        port = port,
-                    ),
-                )
-            ) {
+            val config = ConnectionConfig(
+                provider = provider,
+                host = host,
+                port = port,
+            )
+            when (val result = refreshProviderDiagnosticsUseCase(config)) {
                 is AppResult.Failure -> {
                     _uiState.update {
                         it.copy(
@@ -118,6 +127,7 @@ class DashboardViewModel @Inject constructor(
                 }
 
                 is AppResult.Success -> {
+                    detectProviderCapabilitiesUseCase(config)
                     _uiState.update {
                         it.copy(
                             isRefreshingDiagnostics = false,

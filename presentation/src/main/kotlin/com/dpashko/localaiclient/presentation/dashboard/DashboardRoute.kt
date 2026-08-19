@@ -31,6 +31,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import com.dpashko.localaiclient.domain.models.connection.AiProvider
+import com.dpashko.localaiclient.domain.models.connection.ProviderCapabilities
 import com.dpashko.localaiclient.domain.models.connection.ProviderDiagnostics
 import com.dpashko.localaiclient.domain.models.storage.StoragePrivacyStats
 import com.dpashko.localaiclient.presentation.R
@@ -209,6 +210,7 @@ private fun DashboardScreen(
 
             ProviderDiagnosticsSection(
                 diagnostics = state.providerDiagnostics,
+                capabilities = state.providerCapabilities,
                 isRefreshing = state.isRefreshingDiagnostics,
                 onRefresh = onRefreshProviderDiagnostics,
             )
@@ -285,6 +287,7 @@ private fun StoragePrivacySection(
 @Composable
 private fun ProviderDiagnosticsSection(
     diagnostics: ProviderDiagnostics?,
+    capabilities: ProviderCapabilities?,
     isRefreshing: Boolean,
     onRefresh: () -> Unit,
 ) {
@@ -327,6 +330,23 @@ private fun ProviderDiagnosticsSection(
             Text("Models: ${diagnostics.modelCount?.toString() ?: "Unknown"}")
             Text("Last checked: ${diagnostics.lastCheckedAtMillis.toConversationTimeText()}")
             diagnostics.lastError?.let { error ->
+                Text(
+                    text = error,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
+        }
+
+        capabilities?.let {
+            Text(
+                text = "Capabilities",
+                style = MaterialTheme.typography.titleMedium,
+            )
+            Text("Streaming: ${it.streaming.displayText}")
+            Text("Tools: ${it.tools.displayText}")
+            Text("Embeddings: ${it.embeddings.displayText}")
+            Text("Vision: ${it.vision.displayText}")
+            it.lastError?.let { error ->
                 Text(
                     text = error,
                     color = MaterialTheme.colorScheme.error,

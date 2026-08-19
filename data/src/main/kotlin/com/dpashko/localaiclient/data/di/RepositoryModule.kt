@@ -6,6 +6,7 @@ import com.dpashko.localaiclient.data.repositories.ConnectionPresetRepositoryImp
 import com.dpashko.localaiclient.data.repositories.ConversationRepositoryImpl
 import com.dpashko.localaiclient.data.repositories.GenerationSettingsRepositoryImpl
 import com.dpashko.localaiclient.data.repositories.LastConnectionRepositoryImpl
+import com.dpashko.localaiclient.data.repositories.ProviderCapabilitiesRepositoryImpl
 import com.dpashko.localaiclient.data.repositories.ProviderDiagnosticsRepositoryImpl
 import com.dpashko.localaiclient.data.repositories.SecuritySettingsRepositoryImpl
 import com.dpashko.localaiclient.domain.repositories.ChatGenerationScheduler
@@ -14,6 +15,7 @@ import com.dpashko.localaiclient.domain.repositories.ConversationRepository
 import com.dpashko.localaiclient.domain.repositories.AiProviderRepository
 import com.dpashko.localaiclient.domain.repositories.GenerationSettingsRepository
 import com.dpashko.localaiclient.domain.repositories.LastConnectionRepository
+import com.dpashko.localaiclient.domain.repositories.ProviderCapabilitiesRepository
 import com.dpashko.localaiclient.domain.repositories.ProviderDiagnosticsRepository
 import com.dpashko.localaiclient.domain.repositories.SecuritySettingsRepository
 import dagger.Binds
@@ -72,6 +74,15 @@ abstract class RepositoryModule {
     abstract fun bindProviderDiagnosticsRepository(
         repository: ProviderDiagnosticsRepositoryImpl,
     ): ProviderDiagnosticsRepository
+
+    /**
+     * Binds local provider capability persistence to the domain capabilities contract.
+     */
+    @Binds
+    @Singleton
+    abstract fun bindProviderCapabilitiesRepository(
+        repository: ProviderCapabilitiesRepositoryImpl,
+    ): ProviderCapabilitiesRepository
 
     /**
      * Binds generation settings persistence to the domain settings contract.

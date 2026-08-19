@@ -1,6 +1,7 @@
 package com.dpashko.localaiclient.presentation.dashboard
 
 import com.dpashko.localaiclient.domain.models.connection.AiProvider
+import com.dpashko.localaiclient.domain.models.connection.ProviderCapabilities
 import com.dpashko.localaiclient.domain.models.connection.ProviderDiagnostics
 import com.dpashko.localaiclient.domain.models.storage.StoragePrivacyStats
 
@@ -13,6 +14,7 @@ data class DashboardUiState(
     val port: Int = AiProvider.OLLAMA.defaultPort,
     val activeGenerations: List<ActiveGenerationUi> = emptyList(),
     val providerDiagnostics: ProviderDiagnostics? = null,
+    val providerCapabilities: ProviderCapabilities? = null,
     val storagePrivacyStats: StoragePrivacyStats? = null,
     val isStoppingAll: Boolean = false,
     val isRefreshingDiagnostics: Boolean = false,
