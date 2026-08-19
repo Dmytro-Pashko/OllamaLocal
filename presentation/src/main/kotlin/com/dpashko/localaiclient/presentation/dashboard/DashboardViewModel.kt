@@ -6,7 +6,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.dpashko.localaiclient.domain.models.common.AppResult
 import com.dpashko.localaiclient.domain.models.connection.AiProvider
+import com.dpashko.localaiclient.domain.models.connection.ConnectionConfig
 import com.dpashko.localaiclient.domain.usecases.ObserveActiveGenerationsUseCase
+import com.dpashko.localaiclient.domain.usecases.ObserveProviderDiagnosticsUseCase
+import com.dpashko.localaiclient.domain.usecases.RefreshProviderDiagnosticsUseCase
 import com.dpashko.localaiclient.domain.usecases.StopAllGenerationsUseCase
 import com.dpashko.localaiclient.domain.usecases.StopGenerationUseCase
 import com.dpashko.localaiclient.presentation.Routes
@@ -26,6 +29,8 @@ import kotlinx.coroutines.launch
 class DashboardViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     observeActiveGenerationsUseCase: ObserveActiveGenerationsUseCase,
+    observeProviderDiagnosticsUseCase: ObserveProviderDiagnosticsUseCase,
+    private val refreshProviderDiagnosticsUseCase: RefreshProviderDiagnosticsUseCase,
     private val stopGenerationUseCase: StopGenerationUseCase,
     private val stopAllGenerationsUseCase: StopAllGenerationsUseCase,
 ) : ViewModel() {
@@ -57,6 +62,56 @@ class DashboardViewModel @Inject constructor(
                             )
                         },
                     )
+                }
+            }
+        }
+
+        viewModelScope.launch {
+            observeProviderDiagnosticsUseCase().collect { diagnostics ->
+                _uiState.update {
+                    it.copy(providerDiagnostics = diagnostics)
+                }
+            }
+        }
+    }
+
+    fun refreshProviderDiagnostics() {
+        if (_uiState.value.isRefreshingDiagnostics) {
+            return
+        }
+
+        viewModelScope.launch {
+            _uiState.update {
+                it.copy(
+                    isRefreshingDiagnostics = true,
+                    errorMessage = null,
+                )
+            }
+            when (
+                val result = refreshProviderDiagnosticsUseCase(
+                    ConnectionConfig(
+                        provider = provider,
+                        host = host,
+                        port = port,
+                    ),
+                )
+            ) {
+                is AppResult.Failure -> {
+                    _uiState.update {
+                        it.copy(
+                            isRefreshingDiagnostics = false,
+                            errorMessage = result.error.toUserMessage(),
+                        )
+                    }
+                }
+
+                is AppResult.Success -> {
+                    _uiState.update {
+                        it.copy(
+                            isRefreshingDiagnostics = false,
+                            errorMessage = null,
+                        )
+                    }
                 }
             }
         }

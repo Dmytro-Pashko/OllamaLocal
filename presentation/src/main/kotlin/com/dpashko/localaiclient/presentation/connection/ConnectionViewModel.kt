@@ -7,6 +7,7 @@ import com.dpashko.localaiclient.domain.models.connection.AiProvider
 import com.dpashko.localaiclient.domain.models.connection.ConnectionConfig
 import com.dpashko.localaiclient.domain.models.connection.ConnectionPreset
 import com.dpashko.localaiclient.domain.models.connection.LastConnection
+import com.dpashko.localaiclient.domain.models.connection.ProviderDiagnostics
 import com.dpashko.localaiclient.domain.models.connection.ProviderHealth
 import com.dpashko.localaiclient.domain.models.error.AppError
 import com.dpashko.localaiclient.domain.usecases.ApplyConnectionPresetUseCase
@@ -17,6 +18,7 @@ import com.dpashko.localaiclient.domain.usecases.ObserveConnectionPresetsUseCase
 import com.dpashko.localaiclient.domain.usecases.ObserveLastConnectionUseCase
 import com.dpashko.localaiclient.domain.usecases.SaveConnectionPresetUseCase
 import com.dpashko.localaiclient.domain.usecases.SaveLastConnectionUseCase
+import com.dpashko.localaiclient.domain.usecases.SaveProviderDiagnosticsUseCase
 import com.dpashko.localaiclient.presentation.common.toUserMessage
 import com.dpashko.localaiclient.presentation.ui.models.toUi
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -39,6 +41,7 @@ class ConnectionViewModel @Inject constructor(
     private val observeLastConnectionUseCase: ObserveLastConnectionUseCase,
     private val saveConnectionPresetUseCase: SaveConnectionPresetUseCase,
     private val saveLastConnectionUseCase: SaveLastConnectionUseCase,
+    private val saveProviderDiagnosticsUseCase: SaveProviderDiagnosticsUseCase,
     private val deleteConnectionPresetUseCase: DeleteConnectionPresetUseCase,
     private val applyConnectionPresetUseCase: ApplyConnectionPresetUseCase,
 ) : ViewModel() {
@@ -251,6 +254,12 @@ class ConnectionViewModel @Inject constructor(
 
             when (val connectionResult = connectToProviderUseCase(config)) {
                 is AppResult.Failure -> {
+                    saveDiagnostics(
+                        config = config,
+                        health = connectionResult.error.toProviderHealth(),
+                        modelCount = null,
+                        lastError = connectionResult.error.toUserMessage(),
+                    )
                     _uiState.update {
                         it.copy(
                             isConnecting = false,
@@ -310,6 +319,12 @@ class ConnectionViewModel @Inject constructor(
         val preferredModelName = _uiState.value.selectedModelName
         when (val modelsResult = getAvailableModelsUseCase(config)) {
             is AppResult.Failure -> {
+                saveDiagnostics(
+                    config = config,
+                    health = modelsResult.error.toProviderHealth(),
+                    modelCount = null,
+                    lastError = modelsResult.error.toUserMessage(),
+                )
                 _uiState.update {
                     it.copy(
                         isConnecting = false,
@@ -323,6 +338,12 @@ class ConnectionViewModel @Inject constructor(
 
             is AppResult.Success -> {
                 val models = modelsResult.data.map { it.toUi() }
+                saveDiagnostics(
+                    config = config,
+                    health = ProviderHealth.REACHABLE,
+                    modelCount = models.size,
+                    lastError = null,
+                )
                 val selectedModelName = preferredModelName
                     ?.takeIf { modelName -> models.any { it.name == modelName } }
                     ?: models.firstOrNull()?.name
@@ -369,4 +390,24 @@ class ConnectionViewModel @Inject constructor(
             AppError.Timeout -> ProviderHealth.TIMEOUT
             else -> ProviderHealth.OFFLINE
         }
+
+    private suspend fun saveDiagnostics(
+        config: ConnectionConfig,
+        health: ProviderHealth,
+        modelCount: Int?,
+        lastError: String?,
+    ) {
+        saveProviderDiagnosticsUseCase(
+            ProviderDiagnostics(
+                provider = config.provider,
+                host = config.host,
+                port = config.port,
+                health = health,
+                lastCheckedAtMillis = System.currentTimeMillis(),
+                latencyMillis = null,
+                modelCount = modelCount,
+                lastError = lastError,
+            ),
+        )
+    }
 }

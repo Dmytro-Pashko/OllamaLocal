@@ -27,6 +27,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.dpashko.localaiclient.domain.models.connection.AiProvider
+import com.dpashko.localaiclient.domain.models.connection.ProviderDiagnostics
+import com.dpashko.localaiclient.presentation.common.toConversationTimeText
 
 @Composable
 fun DashboardRoute(
@@ -41,6 +43,7 @@ fun DashboardRoute(
         state = state,
         onStopGeneration = viewModel::stopGeneration,
         onStopAllGenerations = viewModel::stopAllGenerations,
+        onRefreshProviderDiagnostics = viewModel::refreshProviderDiagnostics,
         onOpenConversation = onOpenConversation,
     )
 }
@@ -51,6 +54,7 @@ private fun DashboardScreen(
     state: DashboardUiState,
     onStopGeneration: (Long) -> Unit,
     onStopAllGenerations: () -> Unit,
+    onRefreshProviderDiagnostics: () -> Unit,
     onOpenConversation: (AiProvider, String, Int, String, Long) -> Unit,
 ) {
     var nowMillis by remember { mutableLongStateOf(System.currentTimeMillis()) }
@@ -117,7 +121,58 @@ private fun DashboardScreen(
                 }
             }
 
+            ProviderDiagnosticsSection(
+                diagnostics = state.providerDiagnostics,
+                isRefreshing = state.isRefreshingDiagnostics,
+                onRefresh = onRefreshProviderDiagnostics,
+            )
+
             state.errorMessage?.let { error ->
+                Text(
+                    text = error,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProviderDiagnosticsSection(
+    diagnostics: ProviderDiagnostics?,
+    isRefreshing: Boolean,
+    onRefresh: () -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = "Connection details",
+                style = MaterialTheme.typography.titleLarge,
+            )
+            Button(
+                onClick = onRefresh,
+                enabled = !isRefreshing,
+            ) {
+                Text("Refresh")
+            }
+        }
+
+        if (diagnostics == null) {
+            Text(
+                text = "Not checked",
+                style = MaterialTheme.typography.bodyMedium,
+            )
+        } else {
+            Text("${diagnostics.provider.displayName} • ${diagnostics.providerUrl}")
+            Text("Status: ${diagnostics.health.displayText}")
+            Text("Latency: ${diagnostics.latencyMillis?.let { "$it ms" } ?: "Unknown"}")
+            Text("Models: ${diagnostics.modelCount?.toString() ?: "Unknown"}")
+            Text("Last checked: ${diagnostics.lastCheckedAtMillis.toConversationTimeText()}")
+            diagnostics.lastError?.let { error ->
                 Text(
                     text = error,
                     color = MaterialTheme.colorScheme.error,

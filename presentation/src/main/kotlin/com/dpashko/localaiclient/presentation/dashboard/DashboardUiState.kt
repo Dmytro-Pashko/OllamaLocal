@@ -1,6 +1,7 @@
 package com.dpashko.localaiclient.presentation.dashboard
 
 import com.dpashko.localaiclient.domain.models.connection.AiProvider
+import com.dpashko.localaiclient.domain.models.connection.ProviderDiagnostics
 
 /**
  * Immutable dashboard state for connected local AI work.
@@ -10,7 +11,9 @@ data class DashboardUiState(
     val host: String = "",
     val port: Int = AiProvider.OLLAMA.defaultPort,
     val activeGenerations: List<ActiveGenerationUi> = emptyList(),
+    val providerDiagnostics: ProviderDiagnostics? = null,
     val isStoppingAll: Boolean = false,
+    val isRefreshingDiagnostics: Boolean = false,
     val errorMessage: String? = null,
 )
 
