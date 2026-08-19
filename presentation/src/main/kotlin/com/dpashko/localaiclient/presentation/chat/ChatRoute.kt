@@ -6,6 +6,7 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -23,6 +24,7 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -360,38 +362,58 @@ private fun ChatScreen(
                     textAlign = TextAlign.Center,
                 )
             } else {
-                LazyColumn(
+                Column(
                     modifier = Modifier.fillMaxSize(),
-                    state = listState,
-                    contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    items(
-                        items = state.messages,
-                        key = { it.id },
-                    ) { message ->
-                        MessageBubble(
-                            message = message,
-                            isCurrentSearchMatch = message.id == state.currentSearchMatchMessageId,
-                            isEditEnabled = !state.isSending,
-                            isRetryEnabled = !state.isSending && !state.hasGeneratingMessage,
-                            nowMillis = nowMillis,
-                            isActionsMenuExpanded = actionMessage?.id == message.id,
-                            onMessageLongPress = { actionMessage = message },
-                            onDismissActionsMenu = { actionMessage = null },
-                            onCopyClick = {
-                                clipboardManager.setText(AnnotatedString(message.displayText(nowMillis)))
-                                actionMessage = null
-                                coroutineScope.launch {
-                                    snackbarHostState.showSnackbar("Message copied")
-                                }
-                            },
-                            onEditClick = {
-                                actionMessage = null
-                                onEditClick(message)
-                            },
-                            onRetryClick = onRetryClick,
+                    state.contextEstimate?.let { estimate ->
+                        ContextEstimateChip(
+                            modifier = Modifier
+                                .padding(horizontal = 16.dp)
+                                .padding(top = 12.dp),
+                            tokenCount = estimate.estimatedTokens,
+                            messageCount = estimate.messageCount,
+                            characterCount = estimate.characterCount,
                         )
+                    }
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        state = listState,
+                        contentPadding = PaddingValues(
+                            start = 16.dp,
+                            top = if (state.contextEstimate == null) 16.dp else 0.dp,
+                            end = 16.dp,
+                            bottom = 16.dp,
+                        ),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        items(
+                            items = state.messages,
+                            key = { it.id },
+                        ) { message ->
+                            MessageBubble(
+                                message = message,
+                                isCurrentSearchMatch = message.id == state.currentSearchMatchMessageId,
+                                isEditEnabled = !state.isSending,
+                                isRetryEnabled = !state.isSending && !state.hasGeneratingMessage,
+                                nowMillis = nowMillis,
+                                isActionsMenuExpanded = actionMessage?.id == message.id,
+                                onMessageLongPress = { actionMessage = message },
+                                onDismissActionsMenu = { actionMessage = null },
+                                onCopyClick = {
+                                    clipboardManager.setText(AnnotatedString(message.displayText(nowMillis)))
+                                    actionMessage = null
+                                    coroutineScope.launch {
+                                        snackbarHostState.showSnackbar("Message copied")
+                                    }
+                                },
+                                onEditClick = {
+                                    actionMessage = null
+                                    onEditClick(message)
+                                },
+                                onRetryClick = onRetryClick,
+                            )
+                        }
                     }
                 }
             }
@@ -409,6 +431,32 @@ private fun ChatScreen(
         }
     }
 }
+
+@Composable
+private fun ContextEstimateChip(
+    modifier: Modifier = Modifier,
+    tokenCount: Int,
+    messageCount: Int,
+    characterCount: Int,
+) {
+    AssistChip(
+        modifier = modifier,
+        onClick = {},
+        label = {
+            Text(
+                text = "~${tokenCount.toCompactCount()} tokens • $messageCount messages • " +
+                    "${characterCount.toCompactCount()} chars",
+            )
+        },
+    )
+}
+
+private fun Int.toCompactCount(): String =
+    if (this < 1_000) {
+        toString()
+    } else {
+        "%.1fk".format(this / 1_000.0)
+    }
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable

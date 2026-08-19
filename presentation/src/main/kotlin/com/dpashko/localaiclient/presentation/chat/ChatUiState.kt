@@ -1,6 +1,7 @@
 package com.dpashko.localaiclient.presentation.chat
 
 import com.dpashko.localaiclient.domain.models.connection.AiProvider
+import com.dpashko.localaiclient.domain.models.conversation.ContextEstimate
 import com.dpashko.localaiclient.presentation.ui.models.MessageUi
 
 /**
@@ -23,6 +24,8 @@ data class ChatUiState(
     val conversationId: Long = 0L,
     /** Messages rendered in the chat timeline. */
     val messages: List<MessageUi> = emptyList(),
+    /** Approximate local context size for the next generation. */
+    val contextEstimate: ContextEstimate? = null,
     /** Current composer text or draft text for an edited message. */
     val messageText: String = "",
     /** Message being edited, or null when composing a new message. */

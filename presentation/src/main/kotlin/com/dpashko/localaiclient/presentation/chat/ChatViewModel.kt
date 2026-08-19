@@ -9,6 +9,7 @@ import com.dpashko.localaiclient.domain.models.connection.AiProvider
 import com.dpashko.localaiclient.domain.models.connection.ConnectionConfig
 import com.dpashko.localaiclient.domain.models.conversation.ConversationSettings
 import com.dpashko.localaiclient.domain.usecases.EditMessageAndRegenerateUseCase
+import com.dpashko.localaiclient.domain.usecases.EstimateConversationContextUseCase
 import com.dpashko.localaiclient.domain.usecases.ObserveConversationSettingsUseCase
 import com.dpashko.localaiclient.domain.usecases.ObserveHasGeneratingMessageUseCase
 import com.dpashko.localaiclient.domain.usecases.ObserveMessagesUseCase
@@ -36,6 +37,7 @@ class ChatViewModel @Inject constructor(
     private val observeMessagesUseCase: ObserveMessagesUseCase,
     private val observeHasGeneratingMessageUseCase: ObserveHasGeneratingMessageUseCase,
     private val observeConversationSettingsUseCase: ObserveConversationSettingsUseCase,
+    private val estimateConversationContextUseCase: EstimateConversationContextUseCase,
     private val sendMessageUseCase: SendMessageUseCase,
     private val retryGenerationUseCase: RetryGenerationUseCase,
     private val editMessageAndRegenerateUseCase: EditMessageAndRegenerateUseCase,
@@ -67,6 +69,7 @@ class ChatViewModel @Inject constructor(
                     it.copy(messages = messages.map { message -> message.toUi() })
                         .withSearchMatches()
                 }
+                refreshContextEstimate()
             }
         }
 
@@ -89,6 +92,7 @@ class ChatViewModel @Inject constructor(
                         systemPrompt = settings.systemPrompt,
                     )
                 }
+                refreshContextEstimate()
             }
         }
     }
@@ -436,5 +440,14 @@ class ChatViewModel @Inject constructor(
                 maximumValue = (matches.size - 1).coerceAtLeast(0),
             ),
         )
+    }
+
+    private suspend fun refreshContextEstimate() {
+        when (val result = estimateConversationContextUseCase(conversationId)) {
+            is AppResult.Failure -> Unit
+            is AppResult.Success -> {
+                _uiState.update { it.copy(contextEstimate = result.data) }
+            }
+        }
     }
 }
