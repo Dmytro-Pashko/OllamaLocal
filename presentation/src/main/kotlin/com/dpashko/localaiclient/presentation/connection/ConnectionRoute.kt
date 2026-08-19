@@ -19,6 +19,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -36,6 +37,17 @@ fun ConnectionRoute(
     onOpenConversations: (AiProvider, String, Int, String) -> Unit,
 ) {
     val state by viewModel.uiState.collectAsState()
+
+    LaunchedEffect(
+        state.isConnected,
+        state.selectedModelName,
+    ) {
+        val port = state.port.toIntOrNull()
+        val modelName = state.selectedModelName
+        if (state.isConnected && port != null && modelName != null) {
+            onOpenConversations(state.provider, state.host, port, modelName)
+        }
+    }
 
     ConnectionScreen(
         state = state,
