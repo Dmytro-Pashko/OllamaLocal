@@ -78,7 +78,7 @@ private fun LocalAiClientNavHost() {
             ConnectedShell(
                 onOpenSettings = { navController.navigate(Routes.Settings) },
                 onDisconnect = {
-                    navController.navigate(Routes.Connection) {
+                    navController.navigate(Routes.ServerSelection) {
                         popUpTo(Routes.Connected) { inclusive = true }
                         launchSingleTop = true
                     }
