@@ -24,6 +24,7 @@ import com.dpashko.localaiclient.presentation.chat.ChatRoute
 import com.dpashko.localaiclient.presentation.conversationlist.ConversationListRoute
 import com.dpashko.localaiclient.presentation.connection.ConnectionRoute
 import com.dpashko.localaiclient.presentation.dashboard.DashboardRoute
+import com.dpashko.localaiclient.presentation.serverselection.ServerSelectionRoute
 import com.dpashko.localaiclient.presentation.settings.SettingsRoute
 
 /**
@@ -42,8 +43,15 @@ private fun LocalAiClientNavHost() {
 
     NavHost(
         navController = navController,
-        startDestination = Routes.Connection,
+        startDestination = Routes.ServerSelection,
     ) {
+        composable(Routes.ServerSelection) {
+            ServerSelectionRoute(
+                viewModel = hiltViewModel(),
+                onAddServer = { navController.navigate(Routes.Connection) },
+            )
+        }
+
         composable(Routes.Connection) {
             ConnectionRoute(
                 viewModel = hiltViewModel(),
@@ -175,6 +183,8 @@ private enum class ConnectedTab(
  * Compose Navigation route definitions and route builders.
  */
 object Routes {
+    /** Saved server selection route. */
+    const val ServerSelection = "server-selection"
     /** Connection screen route. */
     const val Connection = "connection"
     /** Provider route argument name. */
