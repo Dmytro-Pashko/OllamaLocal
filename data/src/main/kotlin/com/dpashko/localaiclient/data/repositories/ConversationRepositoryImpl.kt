@@ -46,6 +46,10 @@ class ConversationRepositoryImpl @Inject constructor(
     override fun observeHasGeneratingMessage(conversationId: Long): Flow<Boolean> =
         conversationDao.observeHasGeneratingMessage(conversationId)
 
+    override fun observeActiveGenerations() =
+        conversationDao.observeActiveGenerations()
+            .map { generations -> generations.map { it.toDomain() } }
+
     override fun observeConversationSettings(conversationId: Long): Flow<ConversationSettings?> =
         conversationDao.observeConversationSettings(conversationId)
             .map { settings -> settings?.toDomain() }

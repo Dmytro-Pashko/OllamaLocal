@@ -1,8 +1,10 @@
 package com.dpashko.localaiclient.data.mappers
 
+import com.dpashko.localaiclient.data.models.local.ActiveGenerationEntity
 import com.dpashko.localaiclient.data.models.local.ConversationListItemEntity
 import com.dpashko.localaiclient.data.models.local.ConversationSettingsEntity
 import com.dpashko.localaiclient.data.models.local.MessageEntity
+import com.dpashko.localaiclient.domain.models.conversation.ActiveGeneration
 import com.dpashko.localaiclient.domain.models.conversation.Conversation
 import com.dpashko.localaiclient.domain.models.conversation.ConversationSettings
 import com.dpashko.localaiclient.domain.models.conversation.Message
@@ -37,4 +39,13 @@ fun ConversationSettingsEntity.toDomain(): ConversationSettings =
         modelName = modelName,
         generationTimeoutMillis = generationTimeoutMillis,
         systemPrompt = systemPrompt,
+    )
+
+fun ActiveGenerationEntity.toDomain(): ActiveGeneration =
+    ActiveGeneration(
+        conversationId = conversationId,
+        title = title,
+        modelName = modelName,
+        isArchived = isArchived,
+        assistantMessageCreatedAtMillis = assistantMessageCreatedAtMillis,
     )

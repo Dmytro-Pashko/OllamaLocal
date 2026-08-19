@@ -23,6 +23,7 @@ import com.dpashko.localaiclient.presentation.applock.AppLockRoute
 import com.dpashko.localaiclient.presentation.chat.ChatRoute
 import com.dpashko.localaiclient.presentation.conversationlist.ConversationListRoute
 import com.dpashko.localaiclient.presentation.connection.ConnectionRoute
+import com.dpashko.localaiclient.presentation.dashboard.DashboardRoute
 import com.dpashko.localaiclient.presentation.settings.SettingsRoute
 
 /**
@@ -153,20 +154,12 @@ private fun ConnectedShell(
                 onOpenConversation = onOpenConversation,
             )
 
-            ConnectedTab.DASHBOARD -> DashboardPlaceholder(
+            ConnectedTab.DASHBOARD -> DashboardRoute(
                 modifier = Modifier.padding(innerPadding),
+                viewModel = hiltViewModel(),
+                onOpenConversation = onOpenConversation,
             )
         }
-    }
-}
-
-@Composable
-private fun DashboardPlaceholder(modifier: Modifier = Modifier) {
-    Scaffold(modifier = modifier) { innerPadding ->
-        Text(
-            modifier = Modifier.padding(innerPadding),
-            text = "Dashboard",
-        )
     }
 }
 

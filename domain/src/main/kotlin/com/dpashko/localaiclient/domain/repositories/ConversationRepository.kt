@@ -1,6 +1,7 @@
 package com.dpashko.localaiclient.domain.repositories
 
 import com.dpashko.localaiclient.domain.models.common.AppResult
+import com.dpashko.localaiclient.domain.models.conversation.ActiveGeneration
 import com.dpashko.localaiclient.domain.models.conversation.Conversation
 import com.dpashko.localaiclient.domain.models.conversation.ConversationSettings
 import com.dpashko.localaiclient.domain.models.conversation.Message
@@ -37,6 +38,11 @@ interface ConversationRepository {
      * Observes whether [conversationId] currently has a generating assistant placeholder.
      */
     fun observeHasGeneratingMessage(conversationId: Long): Flow<Boolean>
+
+    /**
+     * Observes all conversations with active assistant generation.
+     */
+    fun observeActiveGenerations(): Flow<List<ActiveGeneration>>
 
     /**
      * Observes generation settings stored for one conversation.

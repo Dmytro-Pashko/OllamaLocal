@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import com.dpashko.localaiclient.data.models.local.ActiveGenerationEntity
 import com.dpashko.localaiclient.data.models.local.ConversationEntity
 import com.dpashko.localaiclient.data.models.local.ConversationListItemEntity
 import com.dpashko.localaiclient.data.models.local.ConversationSettingsEntity
@@ -158,6 +159,27 @@ interface ConversationDao {
         """,
     )
     fun observeHasGeneratingMessage(conversationId: Long): Flow<Boolean>
+
+    /**
+     * Observes conversations that currently have a generating assistant message.
+     */
+    @Query(
+        """
+        SELECT
+            conversations.id AS conversationId,
+            conversations.title,
+            conversations.modelName,
+            conversations.isArchived,
+            MIN(messages.createdAtMillis) AS assistantMessageCreatedAtMillis
+        FROM conversations
+        INNER JOIN messages ON messages.conversationId = conversations.id
+        WHERE messages.role = 'ASSISTANT'
+            AND messages.status = 'GENERATING'
+        GROUP BY conversations.id
+        ORDER BY assistantMessageCreatedAtMillis ASC
+        """,
+    )
+    fun observeActiveGenerations(): Flow<List<ActiveGenerationEntity>>
 
     /**
      * Returns true when a message row exists for [messageId].
