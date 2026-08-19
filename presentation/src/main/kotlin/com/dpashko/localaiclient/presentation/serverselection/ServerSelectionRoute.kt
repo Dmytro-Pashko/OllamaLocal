@@ -19,23 +19,42 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.dpashko.localaiclient.domain.models.connection.AiProvider
 import com.dpashko.localaiclient.domain.models.connection.ConnectionPreset
 
 @Composable
 fun ServerSelectionRoute(
     viewModel: ServerSelectionViewModel,
     onAddServer: () -> Unit,
+    onOpenConnected: (AiProvider, String, Int, String) -> Unit,
 ) {
     val state by viewModel.uiState.collectAsState()
+
+    LaunchedEffect(viewModel) {
+        viewModel.events.collect { event ->
+            when (event) {
+                is ServerSelectionEvent.OpenConnected -> {
+                    onOpenConnected(
+                        event.provider,
+                        event.host,
+                        event.port,
+                        event.modelName,
+                    )
+                }
+            }
+        }
+    }
 
     ServerSelectionScreen(
         state = state,
         onAddServer = onAddServer,
+        onConnectPreset = viewModel::connectPreset,
     )
 }
 
@@ -44,6 +63,7 @@ fun ServerSelectionRoute(
 private fun ServerSelectionScreen(
     state: ServerSelectionUiState,
     onAddServer: () -> Unit,
+    onConnectPreset: (String) -> Unit,
 ) {
     Scaffold(
         topBar = {
@@ -85,7 +105,7 @@ private fun ServerSelectionScreen(
                         ServerPresetItem(
                             preset = preset,
                             isConnecting = state.connectingPresetId == preset.id,
-                            onConnect = {},
+                            onConnect = { onConnectPreset(preset.id) },
                         )
                     }
                 }

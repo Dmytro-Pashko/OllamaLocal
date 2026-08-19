@@ -49,6 +49,13 @@ private fun LocalAiClientNavHost() {
             ServerSelectionRoute(
                 viewModel = hiltViewModel(),
                 onAddServer = { navController.navigate(Routes.Connection) },
+                onOpenConnected = { provider, host, port, modelName ->
+                    navController.navigate(Routes.connected(provider, host, port, modelName)) {
+                        popUpTo(Routes.ServerSelection) {
+                            inclusive = false
+                        }
+                    }
+                },
             )
         }
 
