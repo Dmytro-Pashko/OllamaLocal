@@ -11,6 +11,7 @@ import com.dpashko.localaiclient.domain.models.connection.ProviderDiagnostics
 import com.dpashko.localaiclient.domain.models.connection.ProviderHealth
 import com.dpashko.localaiclient.domain.models.error.AppError
 import com.dpashko.localaiclient.domain.usecases.ConnectToProviderUseCase
+import com.dpashko.localaiclient.domain.usecases.DeleteConnectionPresetUseCase
 import com.dpashko.localaiclient.domain.usecases.GetAvailableModelsUseCase
 import com.dpashko.localaiclient.domain.usecases.ObserveConnectionPresetsUseCase
 import com.dpashko.localaiclient.domain.usecases.SaveLastConnectionUseCase
@@ -33,6 +34,7 @@ import kotlinx.coroutines.launch
 @HiltViewModel
 class ServerSelectionViewModel @Inject constructor(
     private val connectToProviderUseCase: ConnectToProviderUseCase,
+    private val deleteConnectionPresetUseCase: DeleteConnectionPresetUseCase,
     private val getAvailableModelsUseCase: GetAvailableModelsUseCase,
     private val saveLastConnectionUseCase: SaveLastConnectionUseCase,
     private val saveProviderDiagnosticsUseCase: SaveProviderDiagnosticsUseCase,
@@ -72,6 +74,40 @@ class ServerSelectionViewModel @Inject constructor(
             when (val connectionResult = connectToProviderUseCase(config)) {
                 is AppResult.Failure -> handleConnectionFailure(config, connectionResult.error)
                 is AppResult.Success -> loadPresetModels(preset, config)
+            }
+        }
+    }
+
+    fun requestDeletePreset(presetId: String) {
+        val preset = _uiState.value.presets.firstOrNull { it.id == presetId } ?: return
+        _uiState.update { it.copy(deletingPresetCandidate = preset) }
+    }
+
+    fun dismissDeletePreset() {
+        _uiState.update { it.copy(deletingPresetCandidate = null) }
+    }
+
+    fun confirmDeletePreset() {
+        val preset = _uiState.value.deletingPresetCandidate ?: return
+        viewModelScope.launch {
+            when (val result = deleteConnectionPresetUseCase(preset.id)) {
+                is AppResult.Failure -> {
+                    _uiState.update {
+                        it.copy(
+                            deletingPresetCandidate = null,
+                            errorMessage = result.error.toUserMessage(),
+                        )
+                    }
+                }
+
+                is AppResult.Success -> {
+                    _uiState.update {
+                        it.copy(
+                            deletingPresetCandidate = null,
+                            errorMessage = null,
+                        )
+                    }
+                }
             }
         }
     }
