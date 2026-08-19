@@ -71,6 +71,9 @@ fun ChatRoute(
         onEditClick = { message -> viewModel.startEditingMessage(message.id, message.content) },
         onRetryClick = viewModel::retryGeneration,
         onStopGenerationClick = viewModel::stopGeneration,
+        onSearchQueryChanged = viewModel::onChatSearchQueryChanged,
+        onPreviousSearchMatch = viewModel::moveToPreviousSearchMatch,
+        onNextSearchMatch = viewModel::moveToNextSearchMatch,
     )
 }
 
@@ -85,6 +88,9 @@ private fun ChatScreen(
     onEditClick: (MessageUi) -> Unit,
     onRetryClick: (Long) -> Unit,
     onStopGenerationClick: () -> Unit,
+    onSearchQueryChanged: (String) -> Unit,
+    onPreviousSearchMatch: () -> Unit,
+    onNextSearchMatch: () -> Unit,
 ) {
     val listState = rememberLazyListState()
     val clipboardManager = LocalClipboardManager.current
@@ -93,10 +99,19 @@ private fun ChatScreen(
     val hasGeneratingMessage = state.messages.any { it.status == MessageStatus.GENERATING }
     var nowMillis by remember { mutableLongStateOf(System.currentTimeMillis()) }
     var actionMessage by remember { mutableStateOf<MessageUi?>(null) }
+    var isSearchMode by remember { mutableStateOf(false) }
 
     LaunchedEffect(state.messages.size) {
         if (state.messages.isNotEmpty()) {
             listState.animateScrollToItem(state.messages.lastIndex)
+        }
+    }
+
+    LaunchedEffect(state.currentSearchMatchMessageId) {
+        val messageId = state.currentSearchMatchMessageId ?: return@LaunchedEffect
+        val index = state.messages.indexOfFirst { it.id == messageId }
+        if (index >= 0) {
+            listState.animateScrollToItem(index)
         }
     }
 
@@ -113,16 +128,50 @@ private fun ChatScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Column {
-                        Text("Conversation")
-                        Text(
-                            text = state.modelName,
-                            style = MaterialTheme.typography.bodySmall,
-                        )
+                    if (isSearchMode) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            OutlinedTextField(
+                                modifier = Modifier.weight(1f),
+                                value = state.chatSearchQuery,
+                                onValueChange = onSearchQueryChanged,
+                                label = { Text("Search") },
+                                singleLine = true,
+                            )
+                            Text(
+                                text = if (state.chatSearchQuery.isBlank()) {
+                                    "0/0"
+                                } else if (state.searchMatchMessageIds.isEmpty()) {
+                                    "0/0"
+                                } else {
+                                    "${state.currentSearchMatchIndex + 1}/${state.searchMatchMessageIds.size}"
+                                },
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                        }
+                    } else {
+                        Column {
+                            Text("Conversation")
+                            Text(
+                                text = state.modelName,
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                        }
                     }
                 },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(
+                        onClick = {
+                            if (isSearchMode) {
+                                isSearchMode = false
+                                onSearchQueryChanged("")
+                            } else {
+                                onBack()
+                            }
+                        },
+                    ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Back",
@@ -130,6 +179,24 @@ private fun ChatScreen(
                     }
                 },
                 actions = {
+                    if (isSearchMode) {
+                        TextButton(
+                            onClick = onPreviousSearchMatch,
+                            enabled = state.searchMatchMessageIds.isNotEmpty(),
+                        ) {
+                            Text("Prev")
+                        }
+                        TextButton(
+                            onClick = onNextSearchMatch,
+                            enabled = state.searchMatchMessageIds.isNotEmpty(),
+                        ) {
+                            Text("Next")
+                        }
+                    } else {
+                        TextButton(onClick = { isSearchMode = true }) {
+                            Text("Search")
+                        }
+                    }
                     if (state.hasGeneratingMessage) {
                         TextButton(
                             onClick = onStopGenerationClick,
@@ -180,6 +247,7 @@ private fun ChatScreen(
                     ) { message ->
                         MessageBubble(
                             message = message,
+                            isCurrentSearchMatch = message.id == state.currentSearchMatchMessageId,
                             isEditEnabled = !state.isSending,
                             isRetryEnabled = !state.isSending && !state.hasGeneratingMessage,
                             nowMillis = nowMillis,
@@ -221,6 +289,7 @@ private fun ChatScreen(
 @Composable
 private fun MessageBubble(
     message: MessageUi,
+    isCurrentSearchMatch: Boolean,
     isEditEnabled: Boolean,
     isRetryEnabled: Boolean,
     nowMillis: Long,
@@ -233,6 +302,17 @@ private fun MessageBubble(
 ) {
     val isUser = message.role == MessageRole.USER
     val bubbleText = message.displayText(nowMillis)
+    val bubbleColor = when {
+        isCurrentSearchMatch -> MaterialTheme.colorScheme.tertiaryContainer
+        isUser -> MaterialTheme.colorScheme.primaryContainer
+        else -> MaterialTheme.colorScheme.surfaceVariant
+    }
+    val textColor = when {
+        message.status == MessageStatus.FAILED -> MaterialTheme.colorScheme.error
+        isCurrentSearchMatch -> MaterialTheme.colorScheme.onTertiaryContainer
+        isUser -> MaterialTheme.colorScheme.onPrimaryContainer
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start,
@@ -245,11 +325,7 @@ private fun MessageBubble(
                     onLongClick = onMessageLongPress,
                 )
                 .background(
-                    color = if (isUser) {
-                        MaterialTheme.colorScheme.primaryContainer
-                    } else {
-                        MaterialTheme.colorScheme.surfaceVariant
-                    },
+                    color = bubbleColor,
                     shape = RoundedCornerShape(8.dp),
                 )
                 .padding(12.dp),
@@ -264,13 +340,7 @@ private fun MessageBubble(
                 }
                 Text(
                     text = bubbleText,
-                    color = if (message.status == MessageStatus.FAILED) {
-                        MaterialTheme.colorScheme.error
-                    } else if (isUser) {
-                        MaterialTheme.colorScheme.onPrimaryContainer
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    },
+                    color = textColor,
                 )
             }
             Text(

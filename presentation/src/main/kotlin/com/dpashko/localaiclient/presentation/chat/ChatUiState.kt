@@ -27,6 +27,16 @@ data class ChatUiState(
     val isSending: Boolean = false,
     /** True while an assistant response is already generating. */
     val hasGeneratingMessage: Boolean = false,
+    /** Current local search query inside this conversation. */
+    val chatSearchQuery: String = "",
+    /** Message ids that contain [chatSearchQuery]. */
+    val searchMatchMessageIds: List<Long> = emptyList(),
+    /** Index of the focused match inside [searchMatchMessageIds]. */
+    val currentSearchMatchIndex: Int = 0,
     /** User-facing error text for the latest failed UI action. */
     val errorMessage: String? = null,
-)
+) {
+    /** Focused search result message id, or null when there are no matches. */
+    val currentSearchMatchMessageId: Long?
+        get() = searchMatchMessageIds.getOrNull(currentSearchMatchIndex)
+}

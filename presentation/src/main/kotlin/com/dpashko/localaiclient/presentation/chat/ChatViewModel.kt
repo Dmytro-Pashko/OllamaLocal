@@ -60,6 +60,7 @@ class ChatViewModel @Inject constructor(
             observeMessagesUseCase(conversationId).collect { messages ->
                 _uiState.update {
                     it.copy(messages = messages.map { message -> message.toUi() })
+                        .withSearchMatches()
                 }
             }
         }
@@ -83,6 +84,51 @@ class ChatViewModel @Inject constructor(
                 messageText = messageText,
                 errorMessage = null,
             )
+        }
+    }
+
+    /**
+     * Updates local message search within the currently loaded conversation.
+     */
+    fun onChatSearchQueryChanged(query: String) {
+        _uiState.update {
+            it.copy(
+                chatSearchQuery = query,
+                currentSearchMatchIndex = 0,
+                errorMessage = null,
+            ).withSearchMatches()
+        }
+    }
+
+    /**
+     * Moves search focus to the next matching message.
+     */
+    fun moveToNextSearchMatch() {
+        _uiState.update {
+            if (it.searchMatchMessageIds.isEmpty()) {
+                it
+            } else {
+                it.copy(
+                    currentSearchMatchIndex = (it.currentSearchMatchIndex + 1) % it.searchMatchMessageIds.size,
+                )
+            }
+        }
+    }
+
+    /**
+     * Moves search focus to the previous matching message.
+     */
+    fun moveToPreviousSearchMatch() {
+        _uiState.update {
+            if (it.searchMatchMessageIds.isEmpty()) {
+                it
+            } else {
+                it.copy(
+                    currentSearchMatchIndex = (
+                        it.currentSearchMatchIndex - 1 + it.searchMatchMessageIds.size
+                        ) % it.searchMatchMessageIds.size,
+                )
+            }
         }
     }
 
@@ -318,5 +364,23 @@ class ChatViewModel @Inject constructor(
                 }
             }
         }
+    }
+
+    private fun ChatUiState.withSearchMatches(): ChatUiState {
+        val query = chatSearchQuery.trim()
+        val matches = if (query.isBlank()) {
+            emptyList()
+        } else {
+            messages
+                .filter { it.content.contains(query, ignoreCase = true) }
+                .map { it.id }
+        }
+        return copy(
+            searchMatchMessageIds = matches,
+            currentSearchMatchIndex = currentSearchMatchIndex.coerceIn(
+                minimumValue = 0,
+                maximumValue = (matches.size - 1).coerceAtLeast(0),
+            ),
+        )
     }
 }
