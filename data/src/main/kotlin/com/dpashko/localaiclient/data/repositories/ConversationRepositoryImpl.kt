@@ -89,7 +89,42 @@ class ConversationRepositoryImpl @Inject constructor(
 
     override suspend fun getContextMessages(conversationId: Long): AppResult<List<Message>> =
         safeDatabaseCall {
-            conversationDao.getContextMessages(conversationId).map { it.toDomain() }
+            val activeBranch = conversationDao.getActiveBranch(conversationId)
+            val compactedUntilMessage = activeBranch
+                ?.summaryUntilMessageId
+                ?.let { conversationDao.getMessage(it) }
+            val liveMessages = conversationDao.getContextMessages(conversationId)
+                .filter { message ->
+                    compactedUntilMessage == null ||
+                        message.createdAtMillis > compactedUntilMessage.createdAtMillis ||
+                        (
+                            message.createdAtMillis == compactedUntilMessage.createdAtMillis &&
+                                message.id > compactedUntilMessage.id
+                            )
+                }
+                .map { it.toDomain() }
+            val summaryMessage = activeBranch
+                ?.summary
+                ?.trim()
+                ?.takeIf { it.isNotBlank() }
+                ?.let { summary ->
+                    Message(
+                        id = 0L,
+                        conversationId = conversationId,
+                        branchId = activeBranch.id,
+                        role = MessageRole.SYSTEM,
+                        content = "Summary of earlier conversation:\n$summary",
+                        status = MessageStatus.SENT,
+                        errorMessage = null,
+                        createdAtMillis = activeBranch.summaryUpdatedAtMillis ?: 0L,
+                    )
+                }
+            listOfNotNull(summaryMessage) + liveMessages
+        }
+
+    override suspend fun getMessages(conversationId: Long): AppResult<List<Message>> =
+        safeDatabaseCall {
+            conversationDao.getMessages(conversationId).map { it.toDomain() }
         }
 
     override suspend fun messageExists(messageId: Long): AppResult<Boolean> =
@@ -415,6 +450,9 @@ class ConversationRepositoryImpl @Inject constructor(
                     ConversationBranchEntity(
                         conversationId = conversationId,
                         title = "Branch $branchNumber",
+                        summary = null,
+                        summaryUntilMessageId = null,
+                        summaryUpdatedAtMillis = null,
                         createdAtMillis = now,
                         updatedAtMillis = now,
                     ),
@@ -451,6 +489,28 @@ class ConversationRepositoryImpl @Inject constructor(
                 )
                 assistantMessageId
             }
+        }
+
+    override suspend fun saveActiveBranchSummary(
+        conversationId: Long,
+        summary: String,
+        summaryUntilMessageId: Long,
+    ): AppResult<Unit> =
+        safeDatabaseCall {
+            val now = System.currentTimeMillis()
+            val updatedRows = conversationDao.updateActiveBranchSummary(
+                conversationId = conversationId,
+                summary = summary,
+                summaryUntilMessageId = summaryUntilMessageId,
+                summaryUpdatedAtMillis = now,
+            )
+            if (updatedRows == 0) {
+                throw IllegalStateException("Conversation summary cannot be saved.")
+            }
+            conversationDao.updateConversationTimestamp(
+                conversationId = conversationId,
+                updatedAtMillis = now,
+            )
         }
 
     override suspend fun editUserMessageAndDeleteNewer(

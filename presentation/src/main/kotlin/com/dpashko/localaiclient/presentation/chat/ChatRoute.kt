@@ -79,6 +79,7 @@ fun ChatRoute(
         onRegenerateLastAssistantResponse = viewModel::regenerateLastAssistantResponse,
         onBranchFromMessage = viewModel::branchFromMessage,
         onSwitchBranch = viewModel::switchBranch,
+        onCompactConversation = viewModel::compactConversation,
         onStopGenerationClick = viewModel::stopGeneration,
         onSearchQueryChanged = viewModel::onChatSearchQueryChanged,
         onPreviousSearchMatch = viewModel::moveToPreviousSearchMatch,
@@ -100,6 +101,7 @@ private fun ChatScreen(
     onRegenerateLastAssistantResponse: () -> Unit,
     onBranchFromMessage: (Long) -> Unit,
     onSwitchBranch: (Long) -> Unit,
+    onCompactConversation: () -> Unit,
     onStopGenerationClick: () -> Unit,
     onSearchQueryChanged: (String) -> Unit,
     onPreviousSearchMatch: () -> Unit,
@@ -117,6 +119,7 @@ private fun ChatScreen(
     var isSearchMode by remember { mutableStateOf(false) }
     var isToolbarMenuExpanded by remember { mutableStateOf(false) }
     var isStopGenerationDialogVisible by remember { mutableStateOf(false) }
+    var isCompactionDialogVisible by remember { mutableStateOf(false) }
     var isSettingsDialogVisible by remember { mutableStateOf(false) }
     var settingsSystemPrompt by remember { mutableStateOf("") }
 
@@ -173,6 +176,34 @@ private fun ChatScreen(
             },
             dismissButton = {
                 TextButton(onClick = { isStopGenerationDialogVisible = false }) {
+                    Text("Cancel")
+                }
+            },
+        )
+    }
+
+    if (isCompactionDialogVisible) {
+        AlertDialog(
+            onDismissRequest = { isCompactionDialogVisible = false },
+            title = { Text("Compact conversation?") },
+            text = {
+                Text(
+                    "Older messages stay in the chat. The local model creates a summary that is used only for future context.",
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        isCompactionDialogVisible = false
+                        onCompactConversation()
+                    },
+                    enabled = !state.isCompactingConversation,
+                ) {
+                    Text("Compact")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { isCompactionDialogVisible = false }) {
                     Text("Cancel")
                 }
             },
@@ -314,6 +345,17 @@ private fun ChatScreen(
                                 },
                                 enabled = hasAssistantResponse && !state.isSending && !state.hasGeneratingMessage,
                             )
+                            DropdownMenuItem(
+                                text = { Text("Compact conversation") },
+                                onClick = {
+                                    isToolbarMenuExpanded = false
+                                    isCompactionDialogVisible = true
+                                },
+                                enabled = !state.isSending &&
+                                    !state.hasGeneratingMessage &&
+                                    !state.isCompactingConversation &&
+                                    state.messages.size > 8,
+                            )
                             state.branches.forEach { branch ->
                                 DropdownMenuItem(
                                     text = {
@@ -400,14 +442,28 @@ private fun ChatScreen(
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     state.contextEstimate?.let { estimate ->
-                        ContextEstimateChip(
+                        Row(
                             modifier = Modifier
                                 .padding(horizontal = 16.dp)
                                 .padding(top = 12.dp),
-                            tokenCount = estimate.estimatedTokens,
-                            messageCount = estimate.messageCount,
-                            characterCount = estimate.characterCount,
-                        )
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            ContextEstimateChip(
+                                tokenCount = estimate.estimatedTokens,
+                                messageCount = estimate.messageCount,
+                                characterCount = estimate.characterCount,
+                            )
+                            if (state.hasCompactionSummary) {
+                                AssistChip(
+                                    onClick = {},
+                                    label = { Text("Compacted") },
+                                )
+                            }
+                            if (state.isCompactingConversation) {
+                                CircularProgressIndicator()
+                            }
+                        }
                     }
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),

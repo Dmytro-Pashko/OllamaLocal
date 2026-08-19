@@ -30,6 +30,7 @@ object DatabaseModule {
             .addMigrations(LocalAiClientDatabase.MIGRATION_4_5)
             .addMigrations(LocalAiClientDatabase.MIGRATION_5_6)
             .addMigrations(LocalAiClientDatabase.MIGRATION_6_7)
+            .addMigrations(LocalAiClientDatabase.MIGRATION_7_8)
             .build()
 
     @Provides

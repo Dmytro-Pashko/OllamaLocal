@@ -19,7 +19,7 @@ import com.dpashko.localaiclient.domain.models.settings.GenerationSettings
         ConversationBranchEntity::class,
         MessageEntity::class,
     ],
-    version = 7,
+    version = 8,
     exportSchema = false,
 )
 abstract class LocalAiClientDatabase : RoomDatabase() {
@@ -114,6 +114,17 @@ abstract class LocalAiClientDatabase : RoomDatabase() {
                 db.execSQL("UPDATE conversations SET activeBranchId = id")
                 db.execSQL("UPDATE messages SET branchId = conversationId")
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_messages_branchId ON messages(branchId)")
+            }
+        }
+
+        /**
+         * Adds branch-level summaries for local conversation compaction.
+         */
+        val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE conversation_branches ADD COLUMN summary TEXT")
+                db.execSQL("ALTER TABLE conversation_branches ADD COLUMN summaryUntilMessageId INTEGER")
+                db.execSQL("ALTER TABLE conversation_branches ADD COLUMN summaryUpdatedAtMillis INTEGER")
             }
         }
     }

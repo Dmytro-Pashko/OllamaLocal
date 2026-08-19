@@ -8,6 +8,7 @@ import com.dpashko.localaiclient.domain.models.common.AppResult
 import com.dpashko.localaiclient.domain.models.connection.AiProvider
 import com.dpashko.localaiclient.domain.models.connection.ConnectionConfig
 import com.dpashko.localaiclient.domain.models.conversation.ConversationSettings
+import com.dpashko.localaiclient.domain.usecases.CompactConversationUseCase
 import com.dpashko.localaiclient.domain.usecases.CreateMessageBranchUseCase
 import com.dpashko.localaiclient.domain.usecases.EditMessageAndRegenerateUseCase
 import com.dpashko.localaiclient.domain.usecases.EstimateConversationContextUseCase
@@ -47,6 +48,7 @@ class ChatViewModel @Inject constructor(
     private val retryGenerationUseCase: RetryGenerationUseCase,
     private val regenerateLastAssistantResponseUseCase: RegenerateLastAssistantResponseUseCase,
     private val createMessageBranchUseCase: CreateMessageBranchUseCase,
+    private val compactConversationUseCase: CompactConversationUseCase,
     private val switchConversationBranchUseCase: SwitchConversationBranchUseCase,
     private val editMessageAndRegenerateUseCase: EditMessageAndRegenerateUseCase,
     private val stopGenerationUseCase: StopGenerationUseCase,
@@ -109,6 +111,7 @@ class ChatViewModel @Inject constructor(
                 _uiState.update {
                     it.copy(branches = branches)
                 }
+                refreshContextEstimate()
             }
         }
     }
@@ -518,6 +521,54 @@ class ChatViewModel @Inject constructor(
 
                 is AppResult.Success -> {
                     _uiState.update { it.copy(errorMessage = null) }
+                    refreshContextEstimate()
+                }
+            }
+        }
+    }
+
+    /**
+     * Summarizes older local history for future provider context.
+     */
+    fun compactConversation() {
+        if (_uiState.value.isSending || _uiState.value.hasGeneratingMessage || _uiState.value.isCompactingConversation) {
+            return
+        }
+
+        viewModelScope.launch {
+            _uiState.update {
+                it.copy(
+                    isCompactingConversation = true,
+                    errorMessage = null,
+                )
+            }
+
+            val result = compactConversationUseCase(
+                config = ConnectionConfig(
+                    provider = provider,
+                    host = host,
+                    port = port,
+                ),
+                conversationId = conversationId,
+            )
+
+            when (result) {
+                is AppResult.Failure -> {
+                    _uiState.update {
+                        it.copy(
+                            isCompactingConversation = false,
+                            errorMessage = result.error.toUserMessage(),
+                        )
+                    }
+                }
+
+                is AppResult.Success -> {
+                    _uiState.update {
+                        it.copy(
+                            isCompactingConversation = false,
+                            errorMessage = null,
+                        )
+                    }
                     refreshContextEstimate()
                 }
             }

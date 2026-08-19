@@ -24,6 +24,9 @@ data class ConversationBranchEntity(
     val id: Long = 0L,
     val conversationId: Long,
     val title: String,
+    val summary: String? = null,
+    val summaryUntilMessageId: Long? = null,
+    val summaryUpdatedAtMillis: Long? = null,
     val createdAtMillis: Long,
     val updatedAtMillis: Long,
 )

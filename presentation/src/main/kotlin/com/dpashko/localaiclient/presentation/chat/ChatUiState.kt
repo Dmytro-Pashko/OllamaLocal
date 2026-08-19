@@ -35,6 +35,8 @@ data class ChatUiState(
     val editingMessageId: Long? = null,
     /** True while a send, edit, retry, or stop action is being committed. */
     val isSending: Boolean = false,
+    /** True while the app asks the local provider to summarize older context. */
+    val isCompactingConversation: Boolean = false,
     /** True while an assistant response is already generating. */
     val hasGeneratingMessage: Boolean = false,
     /** Current local search query inside this conversation. */
@@ -52,4 +54,7 @@ data class ChatUiState(
 
     val activeBranchTitle: String?
         get() = branches.firstOrNull { it.isActive }?.title
+
+    val hasCompactionSummary: Boolean
+        get() = branches.firstOrNull { it.isActive }?.summary?.isNotBlank() == true
 }

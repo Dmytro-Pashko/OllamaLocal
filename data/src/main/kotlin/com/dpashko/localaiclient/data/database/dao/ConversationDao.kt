@@ -157,6 +157,19 @@ interface ConversationDao {
     suspend fun getActiveBranchId(conversationId: Long): Long?
 
     /**
+     * Returns the currently active branch row for a conversation.
+     */
+    @Query(
+        """
+        SELECT conversation_branches.* FROM conversation_branches
+        INNER JOIN conversations ON conversations.activeBranchId = conversation_branches.id
+        WHERE conversations.id = :conversationId
+        LIMIT 1
+        """,
+    )
+    suspend fun getActiveBranch(conversationId: Long): ConversationBranchEntity?
+
+    /**
      * Observes editable generation settings for one conversation.
      */
     @Query(
@@ -648,6 +661,26 @@ interface ConversationDao {
      */
     @Query("SELECT COUNT(*) FROM conversation_branches WHERE conversationId = :conversationId")
     suspend fun getBranchCount(conversationId: Long): Int
+
+    /**
+     * Stores a local compaction summary for the active branch.
+     */
+    @Query(
+        """
+        UPDATE conversation_branches
+        SET summary = :summary,
+            summaryUntilMessageId = :summaryUntilMessageId,
+            summaryUpdatedAtMillis = :summaryUpdatedAtMillis,
+            updatedAtMillis = :summaryUpdatedAtMillis
+        WHERE id = (SELECT activeBranchId FROM conversations WHERE id = :conversationId)
+        """,
+    )
+    suspend fun updateActiveBranchSummary(
+        conversationId: Long,
+        summary: String,
+        summaryUntilMessageId: Long,
+        summaryUpdatedAtMillis: Long,
+    ): Int
 
     /**
      * Deletes a conversation; message rows are removed by the Room foreign-key cascade.

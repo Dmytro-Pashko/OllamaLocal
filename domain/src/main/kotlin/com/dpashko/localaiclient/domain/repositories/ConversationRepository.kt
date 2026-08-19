@@ -72,6 +72,11 @@ interface ConversationRepository {
     suspend fun getContextMessages(conversationId: Long): AppResult<List<Message>>
 
     /**
+     * Returns messages currently visible in the active branch.
+     */
+    suspend fun getMessages(conversationId: Long): AppResult<List<Message>>
+
+    /**
      * Returns whether a message still exists in local storage.
      */
     suspend fun messageExists(messageId: Long): AppResult<Boolean>
@@ -206,6 +211,15 @@ interface ConversationRepository {
         conversationId: Long,
         messageId: Long,
     ): AppResult<Long>
+
+    /**
+     * Stores a summary for the active branch to shorten future provider context.
+     */
+    suspend fun saveActiveBranchSummary(
+        conversationId: Long,
+        summary: String,
+        summaryUntilMessageId: Long,
+    ): AppResult<Unit>
 
     /**
      * Updates a user message and removes newer messages so regeneration uses the edited context.
