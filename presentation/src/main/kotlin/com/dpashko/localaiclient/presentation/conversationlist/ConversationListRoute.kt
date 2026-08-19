@@ -2,8 +2,6 @@ package com.dpashko.localaiclient.presentation.conversationlist
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,12 +12,17 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -86,12 +89,9 @@ fun ConversationListRoute(
         onSearchQueryChanged = viewModel::onSearchQueryChanged,
         onCreateConversation = viewModel::createConversation,
         onDeleteConversation = viewModel::deleteConversation,
-        onDeleteConversations = viewModel::deleteConversations,
         onRenameConversation = viewModel::renameConversation,
         onSetConversationPinned = viewModel::setConversationPinned,
-        onSetConversationsPinned = viewModel::setConversationsPinned,
         onSetConversationArchived = viewModel::setConversationArchived,
-        onSetConversationsArchived = viewModel::setConversationsArchived,
         onOpenConversation = { conversation ->
             onOpenConversation(
                 state.provider,
@@ -114,37 +114,16 @@ private fun ConversationListScreen(
     onSearchQueryChanged: (String) -> Unit,
     onCreateConversation: () -> Unit,
     onDeleteConversation: (Long) -> Unit,
-    onDeleteConversations: (Set<Long>) -> Unit,
     onRenameConversation: (Long, String) -> Unit,
     onSetConversationPinned: (Long, Boolean) -> Unit,
-    onSetConversationsPinned: (Set<Long>, Boolean) -> Unit,
     onSetConversationArchived: (Long, Boolean) -> Unit,
-    onSetConversationsArchived: (Set<Long>, Boolean) -> Unit,
     onOpenConversation: (ConversationUi) -> Unit,
 ) {
     var pendingDeleteConversation by remember { mutableStateOf<ConversationUi?>(null) }
-    var pendingBulkDeleteIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
     var pendingRenameConversation by remember { mutableStateOf<ConversationUi?>(null) }
     var renameText by remember { mutableStateOf("") }
-    var selectedConversationIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
-    val isSelectionMode = selectedConversationIds.isNotEmpty()
-
-    LaunchedEffect(state.conversations) {
-        val visibleIds = state.conversations.map { it.id }.toSet()
-        selectedConversationIds = selectedConversationIds.intersect(visibleIds)
-    }
-
-    fun clearSelection() {
-        selectedConversationIds = emptySet()
-    }
-
-    fun toggleSelection(conversationId: Long) {
-        selectedConversationIds = if (conversationId in selectedConversationIds) {
-            selectedConversationIds - conversationId
-        } else {
-            selectedConversationIds + conversationId
-        }
-    }
+    var isSearchVisible by remember { mutableStateOf(false) }
+    var isToolbarMenuExpanded by remember { mutableStateOf(false) }
 
     pendingDeleteConversation?.let { conversation ->
         AlertDialog(
@@ -163,30 +142,6 @@ private fun ConversationListScreen(
             },
             dismissButton = {
                 TextButton(onClick = { pendingDeleteConversation = null }) {
-                    Text("Cancel")
-                }
-            },
-        )
-    }
-
-    if (pendingBulkDeleteIds.isNotEmpty()) {
-        AlertDialog(
-            onDismissRequest = { pendingBulkDeleteIds = emptySet() },
-            title = { Text("Delete conversations?") },
-            text = { Text("Selected conversations will be permanently deleted from this device.") },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        onDeleteConversations(pendingBulkDeleteIds)
-                        pendingBulkDeleteIds = emptySet()
-                        clearSelection()
-                    },
-                ) {
-                    Text("Delete")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { pendingBulkDeleteIds = emptySet() }) {
                     Text("Cancel")
                 }
             },
@@ -232,9 +187,7 @@ private fun ConversationListScreen(
             TopAppBar(
                 title = {
                     Text(
-                        if (isSelectionMode) {
-                            "${selectedConversationIds.size} selected"
-                        } else if (state.isArchive) {
+                        if (state.isArchive) {
                             "Archive"
                         } else {
                             "${state.provider.displayName} (${state.host})"
@@ -242,50 +195,44 @@ private fun ConversationListScreen(
                     )
                 },
                 actions = {
-                    if (isSelectionMode) {
-                        TextButton(
+                    IconButton(
+                        onClick = { isToolbarMenuExpanded = true },
+                        enabled = !state.isDisconnecting,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.MoreVert,
+                            contentDescription = "More options",
+                        )
+                    }
+                    DropdownMenu(
+                        expanded = isToolbarMenuExpanded,
+                        onDismissRequest = { isToolbarMenuExpanded = false },
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text(if (isSearchVisible) "Hide search" else "Search") },
                             onClick = {
-                                onSetConversationsPinned(selectedConversationIds, true)
-                                clearSelection()
+                                isToolbarMenuExpanded = false
+                                val shouldShowSearch = !isSearchVisible
+                                isSearchVisible = shouldShowSearch
+                                if (!shouldShowSearch) {
+                                    onSearchQueryChanged("")
+                                }
                             },
-                        ) {
-                            Text("Pin")
-                        }
-                        TextButton(
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Settings") },
                             onClick = {
-                                onSetConversationsPinned(selectedConversationIds, false)
-                                clearSelection()
+                                isToolbarMenuExpanded = false
+                                onOpenSettings()
                             },
-                        ) {
-                            Text("Unpin")
-                        }
-                        TextButton(
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Disconnect") },
                             onClick = {
-                                onSetConversationsArchived(selectedConversationIds, !state.isArchive)
-                                clearSelection()
+                                isToolbarMenuExpanded = false
+                                onDisconnect()
                             },
-                        ) {
-                            Text(if (state.isArchive) "Unarchive" else "Archive")
-                        }
-                        TextButton(onClick = { pendingBulkDeleteIds = selectedConversationIds }) {
-                            Text("Delete")
-                        }
-                        TextButton(onClick = ::clearSelection) {
-                            Text("Cancel")
-                        }
-                    } else {
-                        TextButton(
-                            onClick = onOpenSettings,
-                            enabled = !state.isDisconnecting,
-                        ) {
-                            Text("Settings")
-                        }
-                        TextButton(
-                            onClick = onDisconnect,
-                            enabled = !state.isDisconnecting,
-                        ) {
-                            Text("Disconnect")
-                        }
+                        )
                     }
                 },
             )
@@ -304,16 +251,18 @@ private fun ConversationListScreen(
                 .padding(innerPadding),
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
-                OutlinedTextField(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    value = state.searchQuery,
-                    onValueChange = onSearchQueryChanged,
-                    enabled = !state.isDisconnecting,
-                    label = { Text("Search conversations") },
-                    singleLine = true,
-                )
+                if (isSearchVisible) {
+                    OutlinedTextField(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        value = state.searchQuery,
+                        onValueChange = onSearchQueryChanged,
+                        enabled = !state.isDisconnecting,
+                        label = { Text("Search conversations") },
+                        singleLine = true,
+                    )
+                }
 
                 if (state.conversations.isEmpty()) {
                     Column(
@@ -357,16 +306,7 @@ private fun ConversationListScreen(
                                 onToggleArchived = {
                                     onSetConversationArchived(conversation.id, !conversation.isArchived)
                                 },
-                                isSelectionMode = isSelectionMode,
-                                isSelected = conversation.id in selectedConversationIds,
-                                onSelect = { toggleSelection(conversation.id) },
-                                onOpen = {
-                                    if (isSelectionMode) {
-                                        toggleSelection(conversation.id)
-                                    } else {
-                                        onOpenConversation(conversation)
-                                    }
-                                },
+                                onOpen = { onOpenConversation(conversation) },
                             )
                         }
                     }
@@ -386,7 +326,7 @@ private fun ConversationListScreen(
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SwipeConversationItem(
     conversation: ConversationUi,
@@ -394,11 +334,9 @@ private fun SwipeConversationItem(
     onRenameRequest: () -> Unit,
     onTogglePinned: () -> Unit,
     onToggleArchived: () -> Unit,
-    isSelectionMode: Boolean,
-    isSelected: Boolean,
-    onSelect: () -> Unit,
     onOpen: () -> Unit,
 ) {
+    var isActionsMenuExpanded by remember { mutableStateOf(false) }
     val dismissState = rememberSwipeToDismissBoxState(
         confirmValueChange = { value ->
             if (value == SwipeToDismissBoxValue.EndToStart) {
@@ -432,20 +370,14 @@ private fun SwipeConversationItem(
     ) {
         Column {
             ListItem(
-                modifier = Modifier.combinedClickable(
-                    onClick = onOpen,
-                    onLongClick = onSelect,
-                ),
+                modifier = Modifier.clickable(onClick = onOpen),
                 headlineContent = { Text(conversation.title) },
                 supportingContent = {
                     Text("${conversation.modelName} • ${conversation.updatedAtText}")
                 },
                 leadingContent = {
-                    if (isSelectionMode) {
-                        Checkbox(
-                            checked = isSelected,
-                            onCheckedChange = { onSelect() },
-                        )
+                    if (conversation.isPinned) {
+                        Text("Pinned")
                     }
                 },
                 trailingContent = {
@@ -453,17 +385,40 @@ private fun SwipeConversationItem(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        TextButton(onClick = onTogglePinned) {
-                            Text(if (conversation.isPinned) "Unpin" else "Pin")
-                        }
-                        TextButton(onClick = onRenameRequest) {
-                            Text("Rename")
-                        }
-                        TextButton(onClick = onToggleArchived) {
-                            Text(if (conversation.isArchived) "Unarchive" else "Archive")
-                        }
                         if (conversation.hasGeneratingMessage) {
                             CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                        }
+                        IconButton(onClick = { isActionsMenuExpanded = true }) {
+                            Icon(
+                                imageVector = Icons.Filled.MoreVert,
+                                contentDescription = "Conversation options",
+                            )
+                        }
+                        DropdownMenu(
+                            expanded = isActionsMenuExpanded,
+                            onDismissRequest = { isActionsMenuExpanded = false },
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text(if (conversation.isPinned) "Unpin" else "Pin") },
+                                onClick = {
+                                    isActionsMenuExpanded = false
+                                    onTogglePinned()
+                                },
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Rename") },
+                                onClick = {
+                                    isActionsMenuExpanded = false
+                                    onRenameRequest()
+                                },
+                            )
+                            DropdownMenuItem(
+                                text = { Text(if (conversation.isArchived) "Unarchive" else "Archive") },
+                                onClick = {
+                                    isActionsMenuExpanded = false
+                                    onToggleArchived()
+                                },
+                            )
                         }
                     }
                 },

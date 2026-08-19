@@ -19,6 +19,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -103,6 +104,7 @@ private fun ChatScreen(
     var nowMillis by remember { mutableLongStateOf(System.currentTimeMillis()) }
     var actionMessage by remember { mutableStateOf<MessageUi?>(null) }
     var isSearchMode by remember { mutableStateOf(false) }
+    var isToolbarMenuExpanded by remember { mutableStateOf(false) }
     var isSettingsDialogVisible by remember { mutableStateOf(false) }
     var settingsModelName by remember { mutableStateOf("") }
     var settingsTimeoutMinutes by remember { mutableStateOf("") }
@@ -256,18 +258,33 @@ private fun ChatScreen(
                             Text("Next")
                         }
                     } else {
-                        TextButton(onClick = { isSearchMode = true }) {
-                            Text("Search")
+                        IconButton(onClick = { isToolbarMenuExpanded = true }) {
+                            Icon(
+                                imageVector = Icons.Filled.MoreVert,
+                                contentDescription = "More options",
+                            )
                         }
-                        TextButton(
-                            onClick = {
-                                settingsModelName = state.modelName
-                                settingsTimeoutMinutes = state.generationTimeoutMinutes.toString()
-                                settingsSystemPrompt = state.systemPrompt
-                                isSettingsDialogVisible = true
-                            },
+                        DropdownMenu(
+                            expanded = isToolbarMenuExpanded,
+                            onDismissRequest = { isToolbarMenuExpanded = false },
                         ) {
-                            Text("Settings")
+                            DropdownMenuItem(
+                                text = { Text("Search") },
+                                onClick = {
+                                    isToolbarMenuExpanded = false
+                                    isSearchMode = true
+                                },
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Settings") },
+                                onClick = {
+                                    isToolbarMenuExpanded = false
+                                    settingsModelName = state.modelName
+                                    settingsTimeoutMinutes = state.generationTimeoutMinutes.toString()
+                                    settingsSystemPrompt = state.systemPrompt
+                                    isSettingsDialogVisible = true
+                                },
+                            )
                         }
                     }
                     if (state.hasGeneratingMessage) {
