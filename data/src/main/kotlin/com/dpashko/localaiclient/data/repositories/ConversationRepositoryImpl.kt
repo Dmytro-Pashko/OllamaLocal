@@ -177,6 +177,17 @@ class ConversationRepositoryImpl @Inject constructor(
             }
         }
 
+    override suspend fun updateGeneratingAssistantContent(
+        messageId: Long,
+        content: String,
+    ): AppResult<Boolean> =
+        safeDatabaseCall {
+            conversationDao.updateGeneratingAssistantContent(
+                messageId = messageId,
+                content = content,
+            ) > 0
+        }
+
     override suspend fun failAssistantMessage(
         messageId: Long,
         errorMessage: String,

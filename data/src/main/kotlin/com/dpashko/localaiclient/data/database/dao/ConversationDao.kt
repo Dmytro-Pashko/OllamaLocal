@@ -243,6 +243,23 @@ interface ConversationDao {
     ): Int
 
     /**
+     * Updates partial assistant content while generation is still running.
+     */
+    @Query(
+        """
+        UPDATE messages
+        SET content = :content
+        WHERE id = :messageId
+            AND role = 'ASSISTANT'
+            AND status = 'GENERATING'
+        """,
+    )
+    suspend fun updateGeneratingAssistantContent(
+        messageId: Long,
+        content: String,
+    ): Int
+
+    /**
      * Marks a generating assistant placeholder as failed and returns the affected row count.
      */
     @Query(

@@ -313,7 +313,9 @@ private fun MessageBubble(
 
 private fun MessageUi.displayText(nowMillis: Long): String =
     when (status) {
-        MessageStatus.GENERATING -> "Generating... ${formatElapsedTime(nowMillis - createdAtMillis)}"
+        MessageStatus.GENERATING -> content.ifBlank {
+            "Generating... ${formatElapsedTime(nowMillis - createdAtMillis)}"
+        }
         MessageStatus.FAILED -> content.ifBlank { errorMessage ?: "Generation failed." }
         MessageStatus.CANCELED -> errorMessage ?: "Generation stopped."
         MessageStatus.SENT -> content

@@ -71,8 +71,45 @@ class GenerateAssistantMessageWorker @AssistedInject constructor(
             is AppResult.Success -> result.data
         }
 
+        val streamedContent = StringBuilder()
+        var lastPartialWriteMillis = 0L
+        var partialWritesEnabled = true
+
+        suspend fun flushPartialContent(force: Boolean = false) {
+            if (!partialWritesEnabled || streamedContent.isEmpty()) {
+                return
+            }
+
+            val now = System.currentTimeMillis()
+            if (!force && now - lastPartialWriteMillis < PARTIAL_UPDATE_INTERVAL_MILLIS) {
+                return
+            }
+
+            when (
+                val result = conversationRepository.updateGeneratingAssistantContent(
+                    messageId = assistantMessageId,
+                    content = streamedContent.toString(),
+                )
+            ) {
+                is AppResult.Failure -> {
+                    partialWritesEnabled = false
+                    logger.warn(
+                        "GenerateAssistantMessageWorker failed to persist partial response: {}",
+                        result.error,
+                    )
+                }
+
+                is AppResult.Success -> {
+                    partialWritesEnabled = result.data
+                    if (result.data) {
+                        lastPartialWriteMillis = now
+                    }
+                }
+            }
+        }
+
         val assistantContent = when (
-            val result = aiProviderRepository.sendChatMessage(
+            val result = aiProviderRepository.streamChatMessage(
                 config = ConnectionConfig(
                     provider = provider,
                     host = host,
@@ -81,14 +118,22 @@ class GenerateAssistantMessageWorker @AssistedInject constructor(
                 modelName = modelName,
                 messages = contextMessages,
                 generationTimeoutMillis = generationTimeoutMillis,
+                onDelta = { delta ->
+                    streamedContent.append(delta)
+                    flushPartialContent()
+                },
             )
         ) {
             is AppResult.Failure -> {
+                flushPartialContent(force = true)
                 failAssistantMessage(assistantMessageId, result.error.toWorkerMessage())
                 return Result.success()
             }
 
-            is AppResult.Success -> result.data
+            is AppResult.Success -> {
+                flushPartialContent(force = true)
+                result.data
+            }
         }
 
         if (!assistantMessageExists(assistantMessageId)) {
@@ -202,6 +247,7 @@ class GenerateAssistantMessageWorker @AssistedInject constructor(
         const val KEY_ASSISTANT_MESSAGE_ID = "assistant_message_id"
         const val KEY_MODEL_NAME = "model_name"
         const val KEY_GENERATION_TIMEOUT_MILLIS = "generation_timeout_millis"
+        private const val PARTIAL_UPDATE_INTERVAL_MILLIS = 250L
         private const val CHANNEL_ID = "local_ai_client_generation"
         private const val NOTIFICATION_ID = 1001
 

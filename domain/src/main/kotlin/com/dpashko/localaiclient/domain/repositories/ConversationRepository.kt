@@ -92,6 +92,15 @@ interface ConversationRepository {
     ): AppResult<Unit>
 
     /**
+     * Updates the visible content of a generating assistant message without completing it.
+     * Returns false when the message is no longer in a generating state.
+     */
+    suspend fun updateGeneratingAssistantContent(
+        messageId: Long,
+        content: String,
+    ): AppResult<Boolean>
+
+    /**
      * Marks a generating assistant message as failed with [errorMessage].
      */
     suspend fun failAssistantMessage(

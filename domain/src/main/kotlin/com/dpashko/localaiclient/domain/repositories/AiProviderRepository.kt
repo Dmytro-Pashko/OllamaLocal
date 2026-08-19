@@ -28,4 +28,16 @@ interface AiProviderRepository {
         messages: List<Message>,
         generationTimeoutMillis: Long,
     ): AppResult<String>
+
+    /**
+     * Sends [messages] to [modelName], reports generated text chunks through [onDelta],
+     * and returns the complete generated text after the provider stream finishes.
+     */
+    suspend fun streamChatMessage(
+        config: ConnectionConfig,
+        modelName: String,
+        messages: List<Message>,
+        generationTimeoutMillis: Long,
+        onDelta: suspend (String) -> Unit,
+    ): AppResult<String>
 }

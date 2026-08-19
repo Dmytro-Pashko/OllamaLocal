@@ -4,6 +4,7 @@ import com.dpashko.localaiclient.data.mappers.toDomain
 import com.dpashko.localaiclient.data.mappers.toRemoteDto
 import com.dpashko.localaiclient.data.models.remote.LmStudioChatRequestDto
 import com.dpashko.localaiclient.data.models.remote.LmStudioChatResponseDto
+import com.dpashko.localaiclient.data.models.remote.LmStudioChatStreamResponseDto
 import com.dpashko.localaiclient.data.models.remote.LmStudioModelsResponseDto
 import com.dpashko.localaiclient.data.models.remote.OllamaChatRequestDto
 import com.dpashko.localaiclient.data.models.remote.OllamaChatResponseDto
@@ -25,11 +26,13 @@ import io.ktor.client.request.get
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.HttpResponse
+import io.ktor.client.statement.bodyAsChannel
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 import io.ktor.http.isSuccess
+import io.ktor.utils.io.readUTF8Line
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.Json
 import java.io.IOException
@@ -157,6 +160,82 @@ class AiProviderRepositoryImpl @Inject constructor(
             }
         }
 
+    override suspend fun streamChatMessage(
+        config: ConnectionConfig,
+        modelName: String,
+        messages: List<Message>,
+        generationTimeoutMillis: Long,
+        onDelta: suspend (String) -> Unit,
+    ): AppResult<String> =
+        safeNetworkCall(operation = "streamChatMessage") {
+            val url = when (config.provider) {
+                AiProvider.OLLAMA -> "${config.baseUrl}/api/chat"
+                AiProvider.LM_STUDIO -> "${config.baseUrl}/v1/chat/completions"
+            }
+            logger.info(
+                "{} streamChatMessage request url={} model={} messageCount={}",
+                config.provider.displayName,
+                url,
+                modelName,
+                messages.size,
+            )
+            val response = httpClient.post(url) {
+                timeout {
+                    requestTimeoutMillis = generationTimeoutMillis
+                    socketTimeoutMillis = generationTimeoutMillis
+                }
+                contentType(ContentType.Application.Json)
+                when (config.provider) {
+                    AiProvider.OLLAMA -> setBody(
+                        OllamaChatRequestDto(
+                            model = modelName,
+                            messages = messages.map { it.toRemoteDto() },
+                            stream = true,
+                        ),
+                    )
+
+                    AiProvider.LM_STUDIO -> setBody(
+                        LmStudioChatRequestDto(
+                            model = modelName,
+                            messages = messages.map { it.toRemoteDto() },
+                            stream = true,
+                        ),
+                    )
+                }
+            }
+
+            logger.info("{} streamChatMessage response status={}", config.provider.displayName, response.status)
+            if (!response.status.isSuccess()) {
+                return@safeNetworkCall AppResult.Failure(
+                    response.toAppError(config.provider, operation = "streamChatMessage"),
+                )
+            }
+
+            val assistantContent = StringBuilder()
+            var chunkCount = 0
+            val channel = response.bodyAsChannel()
+            while (true) {
+                val line = channel.readUTF8Line() ?: break
+                val delta = when (config.provider) {
+                    AiProvider.OLLAMA -> line.decodeOllamaStreamDelta()
+                    AiProvider.LM_STUDIO -> line.decodeLmStudioStreamDelta()
+                }
+                if (delta != null) {
+                    chunkCount += 1
+                    assistantContent.append(delta)
+                    onDelta(delta)
+                }
+            }
+
+            logger.info(
+                "{} streamChatMessage parsed chunkCount={} responseChars={}",
+                config.provider.displayName,
+                chunkCount,
+                assistantContent.length,
+            )
+            AppResult.Success(assistantContent.toString())
+        }
+
     private suspend fun <T> safeNetworkCall(
         operation: String,
         block: suspend () -> AppResult<T>,
@@ -239,7 +318,47 @@ class AiProviderRepositoryImpl @Inject constructor(
         }
     }
 
+    private fun String.decodeOllamaStreamDelta(): String? {
+        val line = trim()
+        if (line.isEmpty()) {
+            return null
+        }
+
+        return try {
+            json.decodeFromString<OllamaChatResponseDto>(line).message?.content?.takeIf { it.isNotEmpty() }
+        } catch (exception: Exception) {
+            throw StreamDecodeException()
+        }
+    }
+
+    private fun String.decodeLmStudioStreamDelta(): String? {
+        val line = trim()
+        if (line.isEmpty() || !line.startsWith(SSE_DATA_PREFIX)) {
+            return null
+        }
+
+        val eventData = line.removePrefix(SSE_DATA_PREFIX).trim()
+        if (eventData.isEmpty() || eventData == SSE_DONE_EVENT) {
+            return null
+        }
+
+        return try {
+            json.decodeFromString<LmStudioChatStreamResponseDto>(eventData)
+                .choices
+                .firstOrNull()
+                ?.delta
+                ?.content
+                ?.takeIf { it.isNotEmpty() }
+        } catch (exception: Exception) {
+            throw StreamDecodeException()
+        }
+    }
+
+    private class StreamDecodeException : Exception("Invalid provider stream response.")
+
     private companion object {
+        const val SSE_DATA_PREFIX = "data:"
+        const val SSE_DONE_EVENT = "[DONE]"
         val logger = LoggerFactory.getLogger(AiProviderRepositoryImpl::class.java)
     }
 }
