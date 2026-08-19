@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -23,7 +24,6 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -42,9 +42,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.dpashko.localaiclient.domain.models.connection.AiProvider
+import com.dpashko.localaiclient.presentation.R
 import com.dpashko.localaiclient.presentation.ui.models.ConversationUi
 import kotlinx.coroutines.flow.collectLatest
 
@@ -124,6 +126,38 @@ private fun ConversationListScreen(
     var renameText by remember { mutableStateOf("") }
     var isSearchVisible by remember { mutableStateOf(false) }
     var isToolbarMenuExpanded by remember { mutableStateOf(false) }
+    var isDisconnectDialogVisible by remember { mutableStateOf(false) }
+
+    if (isDisconnectDialogVisible) {
+        AlertDialog(
+            onDismissRequest = {
+                if (!state.isDisconnecting) {
+                    isDisconnectDialogVisible = false
+                }
+            },
+            title = { Text("Disconnect?") },
+            text = { Text("Active generations will be stopped before returning to server selection.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        isDisconnectDialogVisible = false
+                        onDisconnect()
+                    },
+                    enabled = !state.isDisconnecting,
+                ) {
+                    Text("Disconnect")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { isDisconnectDialogVisible = false },
+                    enabled = !state.isDisconnecting,
+                ) {
+                    Text("Cancel")
+                }
+            },
+        )
+    }
 
     pendingDeleteConversation?.let { conversation ->
         AlertDialog(
@@ -210,6 +244,12 @@ private fun ConversationListScreen(
                     ) {
                         DropdownMenuItem(
                             text = { Text(if (isSearchVisible) "Hide search" else "Search") },
+                            leadingIcon = {
+                                Icon(
+                                    painter = painterResource(R.drawable.ic_search),
+                                    contentDescription = null,
+                                )
+                            },
                             onClick = {
                                 isToolbarMenuExpanded = false
                                 val shouldShowSearch = !isSearchVisible
@@ -221,6 +261,12 @@ private fun ConversationListScreen(
                         )
                         DropdownMenuItem(
                             text = { Text("Settings") },
+                            leadingIcon = {
+                                Icon(
+                                    painter = painterResource(R.drawable.ic_settings),
+                                    contentDescription = null,
+                                )
+                            },
                             onClick = {
                                 isToolbarMenuExpanded = false
                                 onOpenSettings()
@@ -228,9 +274,15 @@ private fun ConversationListScreen(
                         )
                         DropdownMenuItem(
                             text = { Text("Disconnect") },
+                            leadingIcon = {
+                                Icon(
+                                    painter = painterResource(R.drawable.ic_disconnect),
+                                    contentDescription = null,
+                                )
+                            },
                             onClick = {
                                 isToolbarMenuExpanded = false
-                                onDisconnect()
+                                isDisconnectDialogVisible = true
                             },
                         )
                     }
@@ -252,16 +304,31 @@ private fun ConversationListScreen(
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
                 if (isSearchVisible) {
-                    OutlinedTextField(
+                    Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(16.dp),
-                        value = state.searchQuery,
-                        onValueChange = onSearchQueryChanged,
-                        enabled = !state.isDisconnecting,
-                        label = { Text("Search conversations") },
-                        singleLine = true,
-                    )
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        OutlinedTextField(
+                            modifier = Modifier.weight(1f),
+                            value = state.searchQuery,
+                            onValueChange = onSearchQueryChanged,
+                            enabled = !state.isDisconnecting,
+                            label = { Text("Search conversations") },
+                            singleLine = true,
+                        )
+                        IconButton(
+                            onClick = { onSearchQueryChanged("") },
+                            enabled = state.searchQuery.isNotEmpty() && !state.isDisconnecting,
+                        ) {
+                            Icon(
+                                painter = painterResource(R.drawable.ic_backspace),
+                                contentDescription = "Clear search",
+                            )
+                        }
+                    }
                 }
 
                 if (state.conversations.isEmpty()) {
@@ -360,69 +427,126 @@ private fun SwipeConversationItem(
                 horizontalArrangement = Arrangement.End,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(
-                    text = "Delete",
-                    color = MaterialTheme.colorScheme.onErrorContainer,
-                    fontWeight = FontWeight.SemiBold,
-                )
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        painter = painterResource(R.drawable.ic_delete),
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onErrorContainer,
+                    )
+                    Text(
+                        text = "Delete",
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
             }
         },
     ) {
-        Column {
-            ListItem(
-                modifier = Modifier.clickable(onClick = onOpen),
-                headlineContent = { Text(conversation.title) },
-                supportingContent = {
-                    Text("${conversation.modelName} • ${conversation.updatedAtText}")
-                },
-                leadingContent = {
+        Column(
+            modifier = Modifier.background(MaterialTheme.colorScheme.background),
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.background)
+                    .clickable(onClick = onOpen)
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(
+                    modifier = Modifier.width(32.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
                     if (conversation.isPinned) {
-                        Text("Pinned")
+                        Icon(
+                            painter = painterResource(R.drawable.ic_star),
+                            contentDescription = "Pinned",
+                        )
                     }
-                },
-                trailingContent = {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
+                }
+
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(horizontal = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    Text(
+                        text = conversation.title,
+                        style = MaterialTheme.typography.bodyLarge,
+                    )
+                    Text(
+                        text = conversation.modelName,
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    Text(
+                        text = conversation.updatedAtText,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    if (conversation.hasGeneratingMessage) {
+                        CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                    }
+                    IconButton(onClick = { isActionsMenuExpanded = true }) {
+                        Icon(
+                            imageVector = Icons.Filled.MoreVert,
+                            contentDescription = "Conversation options",
+                        )
+                    }
+                    DropdownMenu(
+                        expanded = isActionsMenuExpanded,
+                        onDismissRequest = { isActionsMenuExpanded = false },
                     ) {
-                        if (conversation.hasGeneratingMessage) {
-                            CircularProgressIndicator(modifier = Modifier.size(24.dp))
-                        }
-                        IconButton(onClick = { isActionsMenuExpanded = true }) {
-                            Icon(
-                                imageVector = Icons.Filled.MoreVert,
-                                contentDescription = "Conversation options",
-                            )
-                        }
-                        DropdownMenu(
-                            expanded = isActionsMenuExpanded,
-                            onDismissRequest = { isActionsMenuExpanded = false },
-                        ) {
-                            DropdownMenuItem(
-                                text = { Text(if (conversation.isPinned) "Unpin" else "Pin") },
-                                onClick = {
-                                    isActionsMenuExpanded = false
-                                    onTogglePinned()
-                                },
-                            )
-                            DropdownMenuItem(
-                                text = { Text("Rename") },
-                                onClick = {
-                                    isActionsMenuExpanded = false
-                                    onRenameRequest()
-                                },
-                            )
-                            DropdownMenuItem(
-                                text = { Text(if (conversation.isArchived) "Unarchive" else "Archive") },
-                                onClick = {
-                                    isActionsMenuExpanded = false
-                                    onToggleArchived()
-                                },
-                            )
-                        }
+                        DropdownMenuItem(
+                            text = { Text(if (conversation.isPinned) "Unpin" else "Pin") },
+                            leadingIcon = {
+                                Icon(
+                                    painter = painterResource(R.drawable.ic_star),
+                                    contentDescription = null,
+                                )
+                            },
+                            onClick = {
+                                isActionsMenuExpanded = false
+                                onTogglePinned()
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Rename") },
+                            leadingIcon = {
+                                Icon(
+                                    painter = painterResource(R.drawable.ic_rename),
+                                    contentDescription = null,
+                                )
+                            },
+                            onClick = {
+                                isActionsMenuExpanded = false
+                                onRenameRequest()
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = { Text(if (conversation.isArchived) "Unarchive" else "Archive") },
+                            leadingIcon = {
+                                Icon(
+                                    painter = painterResource(R.drawable.ic_archive),
+                                    contentDescription = null,
+                                )
+                            },
+                            onClick = {
+                                isActionsMenuExpanded = false
+                                onToggleArchived()
+                            },
+                        )
                     }
-                },
-            )
+                }
+            }
             HorizontalDivider()
         }
     }

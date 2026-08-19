@@ -1,17 +1,18 @@
 package com.dpashko.localaiclient.presentation.dashboard
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -27,10 +28,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import com.dpashko.localaiclient.domain.models.connection.AiProvider
 import com.dpashko.localaiclient.domain.models.connection.ProviderDiagnostics
 import com.dpashko.localaiclient.domain.models.storage.StoragePrivacyStats
+import com.dpashko.localaiclient.presentation.R
 import com.dpashko.localaiclient.presentation.common.toConversationTimeText
 
 @Composable
@@ -64,6 +67,8 @@ private fun DashboardScreen(
 ) {
     var nowMillis by remember { mutableLongStateOf(System.currentTimeMillis()) }
     var isDeleteAllDialogVisible by remember { mutableStateOf(false) }
+    var isStopAllDialogVisible by remember { mutableStateOf(false) }
+    var stopGenerationCandidateId by remember { mutableStateOf<Long?>(null) }
 
     if (isDeleteAllDialogVisible) {
         AlertDialog(
@@ -88,6 +93,53 @@ private fun DashboardScreen(
         )
     }
 
+    if (isStopAllDialogVisible) {
+        AlertDialog(
+            onDismissRequest = { isStopAllDialogVisible = false },
+            title = { Text("Stop all generations?") },
+            text = { Text("All active assistant responses will be stopped.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        isStopAllDialogVisible = false
+                        onStopAllGenerations()
+                    },
+                    enabled = !state.isStoppingAll,
+                ) {
+                    Text("Stop all")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { isStopAllDialogVisible = false }) {
+                    Text("Cancel")
+                }
+            },
+        )
+    }
+
+    stopGenerationCandidateId?.let { conversationId ->
+        AlertDialog(
+            onDismissRequest = { stopGenerationCandidateId = null },
+            title = { Text("Stop generation?") },
+            text = { Text("The selected assistant response will be stopped.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        stopGenerationCandidateId = null
+                        onStopGeneration(conversationId)
+                    },
+                ) {
+                    Text("Stop")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { stopGenerationCandidateId = null }) {
+                    Text("Cancel")
+                }
+            },
+        )
+    }
+
     LaunchedEffect(state.activeGenerations.isNotEmpty()) {
         while (state.activeGenerations.isNotEmpty()) {
             nowMillis = System.currentTimeMillis()
@@ -101,6 +153,7 @@ private fun DashboardScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
+                .verticalScroll(rememberScrollState())
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
@@ -114,10 +167,19 @@ private fun DashboardScreen(
                     style = MaterialTheme.typography.titleLarge,
                 )
                 Button(
-                    onClick = onStopAllGenerations,
+                    onClick = { isStopAllDialogVisible = true },
                     enabled = state.activeGenerations.isNotEmpty() && !state.isStoppingAll,
                 ) {
-                    Text("Stop all")
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            painter = painterResource(R.drawable.ic_cancel),
+                            contentDescription = null,
+                        )
+                        Text("Stop all")
+                    }
                 }
             }
 
@@ -127,26 +189,21 @@ private fun DashboardScreen(
                     style = MaterialTheme.typography.bodyMedium,
                 )
             } else {
-                LazyColumn {
-                    items(
-                        items = state.activeGenerations,
-                        key = { it.conversationId },
-                    ) { generation ->
-                        ActiveGenerationRow(
-                            generation = generation,
-                            elapsedMillis = nowMillis - generation.assistantMessageCreatedAtMillis,
-                            onOpen = {
-                                onOpenConversation(
-                                    state.provider,
-                                    state.host,
-                                    state.port,
-                                    generation.modelName,
-                                    generation.conversationId,
-                                )
-                            },
-                            onStop = { onStopGeneration(generation.conversationId) },
-                        )
-                    }
+                state.activeGenerations.forEach { generation ->
+                    ActiveGenerationRow(
+                        generation = generation,
+                        elapsedMillis = nowMillis - generation.assistantMessageCreatedAtMillis,
+                        onOpen = {
+                            onOpenConversation(
+                                state.provider,
+                                state.host,
+                                state.port,
+                                generation.modelName,
+                                generation.conversationId,
+                            )
+                        },
+                        onStop = { stopGenerationCandidateId = generation.conversationId },
+                    )
                 }
             }
 
@@ -158,8 +215,8 @@ private fun DashboardScreen(
 
             StoragePrivacySection(
                 stats = state.storagePrivacyStats,
-                isDeleting = state.isDeletingSessionData,
                 deleteMessage = state.sessionDeleteMessage,
+                isDeleting = state.isDeletingSessionData,
                 onDeleteAll = { isDeleteAllDialogVisible = true },
             )
 
@@ -176,8 +233,8 @@ private fun DashboardScreen(
 @Composable
 private fun StoragePrivacySection(
     stats: StoragePrivacyStats?,
-    isDeleting: Boolean,
     deleteMessage: String?,
+    isDeleting: Boolean,
     onDeleteAll: () -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -190,12 +247,6 @@ private fun StoragePrivacySection(
                 text = "Local storage",
                 style = MaterialTheme.typography.titleLarge,
             )
-            Button(
-                onClick = onDeleteAll,
-                enabled = !isDeleting,
-            ) {
-                Text("Delete all")
-            }
         }
 
         if (stats == null) {
@@ -210,6 +261,23 @@ private fun StoragePrivacySection(
 
         deleteMessage?.let { message ->
             Text(message)
+        }
+
+        Button(
+            modifier = Modifier.fillMaxWidth(),
+            onClick = onDeleteAll,
+            enabled = !isDeleting,
+        ) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    painter = painterResource(R.drawable.ic_delete),
+                    contentDescription = null,
+                )
+                Text("Delete all conversations")
+            }
         }
     }
 }
@@ -234,7 +302,16 @@ private fun ProviderDiagnosticsSection(
                 onClick = onRefresh,
                 enabled = !isRefreshing,
             ) {
-                Text("Refresh")
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        painter = painterResource(R.drawable.ic_refresh),
+                        contentDescription = null,
+                    )
+                    Text("Refresh")
+                }
             }
         }
 
@@ -278,7 +355,16 @@ private fun ActiveGenerationRow(
             },
             trailingContent = {
                 TextButton(onClick = onStop) {
-                    Text("Stop")
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            painter = painterResource(R.drawable.ic_cancel),
+                            contentDescription = null,
+                        )
+                        Text("Stop")
+                    }
                 }
             },
         )

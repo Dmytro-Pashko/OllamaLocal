@@ -2,6 +2,7 @@ package com.dpashko.localaiclient.presentation
 
 import android.net.Uri
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
@@ -12,6 +13,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -24,6 +26,7 @@ import com.dpashko.localaiclient.presentation.chat.ChatRoute
 import com.dpashko.localaiclient.presentation.conversationlist.ConversationListRoute
 import com.dpashko.localaiclient.presentation.connection.ConnectionRoute
 import com.dpashko.localaiclient.presentation.dashboard.DashboardRoute
+import com.dpashko.localaiclient.presentation.R
 import com.dpashko.localaiclient.presentation.serverselection.ServerSelectionRoute
 import com.dpashko.localaiclient.presentation.settings.SettingsRoute
 
@@ -137,7 +140,12 @@ private fun ConnectedShell(
                     NavigationBarItem(
                         selected = selectedTab == tab,
                         onClick = { selectedTab = tab },
-                        icon = {},
+                        icon = {
+                            Icon(
+                                painter = painterResource(tab.iconResId),
+                                contentDescription = null,
+                            )
+                        },
                         label = { Text(tab.label) },
                     )
                 }
@@ -174,10 +182,11 @@ private fun ConnectedShell(
 
 private enum class ConnectedTab(
     val label: String,
+    val iconResId: Int,
 ) {
-    CONVERSATIONS("Conversations"),
-    ARCHIVE("Archive"),
-    DASHBOARD("Dashboard"),
+    CONVERSATIONS("Conversations", R.drawable.ic_chat),
+    ARCHIVE("Archive", R.drawable.ic_archive),
+    DASHBOARD("Dashboard", R.drawable.ic_monitoring),
 }
 
 /**

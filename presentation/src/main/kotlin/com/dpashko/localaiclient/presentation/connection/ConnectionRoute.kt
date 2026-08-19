@@ -31,10 +31,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.dpashko.localaiclient.domain.models.connection.AiProvider
+import com.dpashko.localaiclient.presentation.R
 
 @Composable
 fun ConnectionRoute(
@@ -179,6 +182,12 @@ private fun ConnectionScreen(
                 value = state.host,
                 onValueChange = onHostChanged,
                 label = { Text("IP address") },
+                leadingIcon = {
+                    Icon(
+                        painter = painterResource(R.drawable.ic_lan),
+                        contentDescription = null,
+                    )
+                },
                 singleLine = true,
                 enabled = !state.isBusy,
             )
@@ -201,7 +210,16 @@ private fun ConnectionScreen(
                 if (state.isConnecting) {
                     CircularProgressIndicator()
                 } else {
-                    Text("Connect")
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            painter = painterResource(R.drawable.ic_send),
+                            contentDescription = null,
+                        )
+                        Text("Connect")
+                    }
                 }
             }
 
@@ -239,6 +257,12 @@ private fun ConnectionScreen(
                     readOnly = true,
                     enabled = state.isConnected,
                     label = { Text("Model") },
+                    leadingIcon = {
+                        Icon(
+                            painter = painterResource(R.drawable.ic_database),
+                            contentDescription = null,
+                        )
+                    },
                     trailingIcon = {
                         ExposedDropdownMenuDefaults.TrailingIcon(expanded = isModelMenuExpanded)
                     },

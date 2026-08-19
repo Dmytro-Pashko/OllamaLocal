@@ -34,8 +34,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.dpashko.localaiclient.presentation.R
 import kotlinx.coroutines.flow.collectLatest
 
 @Composable
@@ -76,7 +78,32 @@ private fun SettingsScreen(
     onDeleteAllSessionDataClick: () -> Unit,
 ) {
     var isDeleteAllDialogVisible by remember { mutableStateOf(false) }
+    var isResetDialogVisible by remember { mutableStateOf(false) }
     val isBusy = state.isApplying || state.isDeletingSessionData
+
+    if (isResetDialogVisible) {
+        AlertDialog(
+            onDismissRequest = { isResetDialogVisible = false },
+            title = { Text("Reset settings?") },
+            text = { Text("This resets the draft settings to default values.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        isResetDialogVisible = false
+                        onResetClick()
+                    },
+                    enabled = !isBusy,
+                ) {
+                    Text("Reset")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { isResetDialogVisible = false }) {
+                    Text("Cancel")
+                }
+            },
+        )
+    }
 
     if (isDeleteAllDialogVisible) {
         AlertDialog(
@@ -123,7 +150,7 @@ private fun SettingsScreen(
                 },
                 actions = {
                     TextButton(
-                        onClick = onResetClick,
+                        onClick = { isResetDialogVisible = true },
                         enabled = !isBusy,
                     ) {
                         Text("Reset")
@@ -162,6 +189,12 @@ private fun SettingsScreen(
                 onValueChange = onTimeoutMinutesChanged,
                 enabled = !isBusy,
                 label = { Text("Generation timeout") },
+                leadingIcon = {
+                    Icon(
+                        painter = painterResource(R.drawable.ic_timer),
+                        contentDescription = null,
+                    )
+                },
                 suffix = { Text("minutes") },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -173,10 +206,19 @@ private fun SettingsScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(
-                    text = "Require device unlock",
-                    style = MaterialTheme.typography.bodyLarge,
-                )
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        painter = painterResource(R.drawable.ic_key),
+                        contentDescription = null,
+                    )
+                    Text(
+                        text = "Require device unlock",
+                        style = MaterialTheme.typography.bodyLarge,
+                    )
+                }
                 Switch(
                     checked = state.appLockEnabled,
                     onCheckedChange = onAppLockEnabledChanged,
@@ -196,7 +238,16 @@ private fun SettingsScreen(
                 if (state.isDeletingSessionData) {
                     CircularProgressIndicator()
                 } else {
-                    Text("Delete all conversations")
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            painter = painterResource(R.drawable.ic_delete),
+                            contentDescription = null,
+                        )
+                        Text("Delete all conversations")
+                    }
                 }
             }
 

@@ -48,11 +48,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.dpashko.localaiclient.domain.models.conversation.MessageRole
 import com.dpashko.localaiclient.domain.models.conversation.MessageStatus
+import com.dpashko.localaiclient.presentation.R
 import com.dpashko.localaiclient.presentation.ui.models.MessageUi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -105,9 +107,8 @@ private fun ChatScreen(
     var actionMessage by remember { mutableStateOf<MessageUi?>(null) }
     var isSearchMode by remember { mutableStateOf(false) }
     var isToolbarMenuExpanded by remember { mutableStateOf(false) }
+    var isStopGenerationDialogVisible by remember { mutableStateOf(false) }
     var isSettingsDialogVisible by remember { mutableStateOf(false) }
-    var settingsModelName by remember { mutableStateOf("") }
-    var settingsTimeoutMinutes by remember { mutableStateOf("") }
     var settingsSystemPrompt by remember { mutableStateOf("") }
 
     if (isSettingsDialogVisible) {
@@ -115,51 +116,54 @@ private fun ChatScreen(
             onDismissRequest = { isSettingsDialogVisible = false },
             title = { Text("Conversation settings") },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    OutlinedTextField(
-                        modifier = Modifier.fillMaxWidth(),
-                        value = settingsModelName,
-                        onValueChange = { settingsModelName = it },
-                        label = { Text("Model") },
-                        singleLine = true,
-                    )
-                    OutlinedTextField(
-                        modifier = Modifier.fillMaxWidth(),
-                        value = settingsTimeoutMinutes,
-                        onValueChange = { value ->
-                            if (value.all { it.isDigit() }) {
-                                settingsTimeoutMinutes = value
-                            }
-                        },
-                        label = { Text("Timeout minutes") },
-                        singleLine = true,
-                    )
-                    OutlinedTextField(
-                        modifier = Modifier.fillMaxWidth(),
-                        value = settingsSystemPrompt,
-                        onValueChange = { settingsSystemPrompt = it.take(4_000) },
-                        label = { Text("System prompt") },
-                        minLines = 3,
-                    )
-                }
+                OutlinedTextField(
+                    modifier = Modifier.fillMaxWidth(),
+                    value = settingsSystemPrompt,
+                    onValueChange = { settingsSystemPrompt = it.take(4_000) },
+                    label = { Text("System prompt") },
+                    minLines = 3,
+                )
             },
             confirmButton = {
                 TextButton(
                     onClick = {
                         onSaveConversationSettings(
-                            settingsModelName,
-                            settingsTimeoutMinutes,
+                            state.modelName,
+                            state.generationTimeoutMinutes.toString(),
                             settingsSystemPrompt,
                         )
                         isSettingsDialogVisible = false
                     },
-                    enabled = settingsModelName.isNotBlank() && settingsTimeoutMinutes.isNotBlank(),
                 ) {
                     Text("Save")
                 }
             },
             dismissButton = {
                 TextButton(onClick = { isSettingsDialogVisible = false }) {
+                    Text("Cancel")
+                }
+            },
+        )
+    }
+
+    if (isStopGenerationDialogVisible) {
+        AlertDialog(
+            onDismissRequest = { isStopGenerationDialogVisible = false },
+            title = { Text("Stop generation?") },
+            text = { Text("The current assistant response will be stopped.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        isStopGenerationDialogVisible = false
+                        onStopGenerationClick()
+                    },
+                    enabled = !state.isSending,
+                ) {
+                    Text("Stop")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { isStopGenerationDialogVisible = false }) {
                     Text("Cancel")
                 }
             },
@@ -198,13 +202,25 @@ private fun ChatScreen(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            OutlinedTextField(
+                            Row(
                                 modifier = Modifier.weight(1f),
-                                value = state.chatSearchQuery,
-                                onValueChange = onSearchQueryChanged,
-                                label = { Text("Search") },
-                                singleLine = true,
-                            )
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                OutlinedTextField(
+                                    modifier = Modifier.weight(1f),
+                                    value = state.chatSearchQuery,
+                                    onValueChange = onSearchQueryChanged,
+                                    label = { Text("Search") },
+                                    singleLine = true,
+                                )
+                                IconButton(onClick = { onSearchQueryChanged("") }) {
+                                    Icon(
+                                        painter = painterResource(R.drawable.ic_backspace),
+                                        contentDescription = "Clear search",
+                                    )
+                                }
+                            }
                             Text(
                                 text = if (state.chatSearchQuery.isBlank()) {
                                     "0/0"
@@ -270,6 +286,12 @@ private fun ChatScreen(
                         ) {
                             DropdownMenuItem(
                                 text = { Text("Search") },
+                                leadingIcon = {
+                                    Icon(
+                                        painter = painterResource(R.drawable.ic_search),
+                                        contentDescription = null,
+                                    )
+                                },
                                 onClick = {
                                     isToolbarMenuExpanded = false
                                     isSearchMode = true
@@ -277,10 +299,14 @@ private fun ChatScreen(
                             )
                             DropdownMenuItem(
                                 text = { Text("Settings") },
+                                leadingIcon = {
+                                    Icon(
+                                        painter = painterResource(R.drawable.ic_settings),
+                                        contentDescription = null,
+                                    )
+                                },
                                 onClick = {
                                     isToolbarMenuExpanded = false
-                                    settingsModelName = state.modelName
-                                    settingsTimeoutMinutes = state.generationTimeoutMinutes.toString()
                                     settingsSystemPrompt = state.systemPrompt
                                     isSettingsDialogVisible = true
                                 },
@@ -289,10 +315,19 @@ private fun ChatScreen(
                     }
                     if (state.hasGeneratingMessage) {
                         TextButton(
-                            onClick = onStopGenerationClick,
+                            onClick = { isStopGenerationDialogVisible = true },
                             enabled = !state.isSending,
                         ) {
-                            Text("Stop")
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Icon(
+                                    painter = painterResource(R.drawable.ic_cancel),
+                                    contentDescription = null,
+                                )
+                                Text("Stop")
+                            }
                         }
                     }
                 },
@@ -539,7 +574,16 @@ private fun MessageInputBar(
             if (isSending) {
                 CircularProgressIndicator()
             } else {
-                Text(if (isEditing) "Save" else "Send")
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        painter = painterResource(R.drawable.ic_send),
+                        contentDescription = null,
+                    )
+                    Text(if (isEditing) "Save" else "Send")
+                }
             }
         }
     }

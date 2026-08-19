@@ -15,7 +15,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.ListItem
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SwipeToDismissBox
@@ -30,10 +30,12 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.dpashko.localaiclient.domain.models.connection.AiProvider
 import com.dpashko.localaiclient.domain.models.connection.ConnectionPreset
+import com.dpashko.localaiclient.presentation.R
 
 @Composable
 fun ServerSelectionRoute(
@@ -189,19 +191,34 @@ private fun SwipeServerPresetItem(
                     .padding(horizontal = 24.dp),
                 contentAlignment = Alignment.CenterEnd,
             ) {
-                Text(
-                    text = "Delete",
-                    color = MaterialTheme.colorScheme.onErrorContainer,
-                    fontWeight = FontWeight.SemiBold,
-                )
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        painter = painterResource(R.drawable.ic_delete),
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onErrorContainer,
+                    )
+                    Text(
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                        fontWeight = FontWeight.SemiBold,
+                        text = "Delete",
+                    )
+                }
             }
         },
     ) {
-        ServerPresetItem(
-            preset = preset,
-            isConnecting = isConnecting,
-            onConnect = onConnect,
-        )
+        Column(
+            modifier = Modifier.background(MaterialTheme.colorScheme.background),
+        ) {
+            ServerPresetItem(
+                preset = preset,
+                isConnecting = isConnecting,
+                onConnect = onConnect,
+            )
+            HorizontalDivider()
+        }
     }
 }
 
@@ -211,33 +228,62 @@ private fun ServerPresetItem(
     isConnecting: Boolean,
     onConnect: () -> Unit,
 ) {
-    Column {
-        ListItem(
-            headlineContent = { Text(preset.name) },
-            supportingContent = {
-                Column {
-                    Text(preset.provider.displayName)
-                    Text("${preset.host}:${preset.port}")
-                    preset.modelName?.let { modelName ->
-                        Text(modelName)
-                    }
-                }
-            },
-            trailingContent = {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    TextButton(
-                        onClick = onConnect,
-                        enabled = !isConnecting,
-                    ) {
-                        if (isConnecting) {
-                            CircularProgressIndicator()
-                        } else {
-                            Text("Connect")
-                        }
-                    }
-                }
-            },
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.background)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            painter = painterResource(R.drawable.ic_computer),
+            contentDescription = null,
         )
-        HorizontalDivider()
+
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Text(
+                text = preset.name,
+                style = MaterialTheme.typography.bodyLarge,
+            )
+            Text(
+                text = preset.provider.displayName,
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            Text(
+                text = "${preset.host}:${preset.port}",
+                style = MaterialTheme.typography.bodySmall,
+            )
+            preset.modelName?.let { modelName ->
+                Text(
+                    text = modelName,
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+        }
+
+        TextButton(
+            onClick = onConnect,
+            enabled = !isConnecting,
+        ) {
+            if (isConnecting) {
+                CircularProgressIndicator()
+            } else {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        painter = painterResource(R.drawable.ic_send),
+                        contentDescription = null,
+                    )
+                    Text("Connect")
+                }
+            }
+        }
     }
 }
