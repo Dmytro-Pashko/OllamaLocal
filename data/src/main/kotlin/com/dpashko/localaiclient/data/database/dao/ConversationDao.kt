@@ -9,6 +9,7 @@ import com.dpashko.localaiclient.data.models.local.ConversationEntity
 import com.dpashko.localaiclient.data.models.local.ConversationListItemEntity
 import com.dpashko.localaiclient.data.models.local.ConversationSettingsEntity
 import com.dpashko.localaiclient.data.models.local.MessageEntity
+import com.dpashko.localaiclient.data.models.local.StoragePrivacyStatsEntity
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -180,6 +181,24 @@ interface ConversationDao {
         """,
     )
     fun observeActiveGenerations(): Flow<List<ActiveGenerationEntity>>
+
+    /**
+     * Observes aggregate local storage counters for the dashboard.
+     */
+    @Query(
+        """
+        SELECT
+            (SELECT COUNT(*) FROM conversations WHERE isArchived = 0) AS activeConversationCount,
+            (SELECT COUNT(*) FROM conversations WHERE isArchived = 1) AS archivedConversationCount,
+            (SELECT COUNT(*) FROM messages) AS messageCount,
+            (
+                SELECT COUNT(*) FROM messages
+                WHERE role = 'ASSISTANT'
+                    AND status = 'GENERATING'
+            ) AS activeGenerationCount
+        """,
+    )
+    fun observeStoragePrivacyStats(): Flow<StoragePrivacyStatsEntity>
 
     /**
      * Returns true when a message row exists for [messageId].

@@ -7,8 +7,10 @@ import androidx.lifecycle.viewModelScope
 import com.dpashko.localaiclient.domain.models.common.AppResult
 import com.dpashko.localaiclient.domain.models.connection.AiProvider
 import com.dpashko.localaiclient.domain.models.connection.ConnectionConfig
+import com.dpashko.localaiclient.domain.usecases.DeleteAllSessionDataUseCase
 import com.dpashko.localaiclient.domain.usecases.ObserveActiveGenerationsUseCase
 import com.dpashko.localaiclient.domain.usecases.ObserveProviderDiagnosticsUseCase
+import com.dpashko.localaiclient.domain.usecases.ObserveStoragePrivacyStatsUseCase
 import com.dpashko.localaiclient.domain.usecases.RefreshProviderDiagnosticsUseCase
 import com.dpashko.localaiclient.domain.usecases.StopAllGenerationsUseCase
 import com.dpashko.localaiclient.domain.usecases.StopGenerationUseCase
@@ -30,9 +32,11 @@ class DashboardViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     observeActiveGenerationsUseCase: ObserveActiveGenerationsUseCase,
     observeProviderDiagnosticsUseCase: ObserveProviderDiagnosticsUseCase,
+    observeStoragePrivacyStatsUseCase: ObserveStoragePrivacyStatsUseCase,
     private val refreshProviderDiagnosticsUseCase: RefreshProviderDiagnosticsUseCase,
     private val stopGenerationUseCase: StopGenerationUseCase,
     private val stopAllGenerationsUseCase: StopAllGenerationsUseCase,
+    private val deleteAllSessionDataUseCase: DeleteAllSessionDataUseCase,
 ) : ViewModel() {
     private val provider = AiProvider.fromRouteValue(savedStateHandle[Routes.ArgProvider])
     private val host = Uri.decode(savedStateHandle[Routes.ArgHost] ?: "")
@@ -70,6 +74,14 @@ class DashboardViewModel @Inject constructor(
             observeProviderDiagnosticsUseCase().collect { diagnostics ->
                 _uiState.update {
                     it.copy(providerDiagnostics = diagnostics)
+                }
+            }
+        }
+
+        viewModelScope.launch {
+            observeStoragePrivacyStatsUseCase().collect { stats ->
+                _uiState.update {
+                    it.copy(storagePrivacyStats = stats)
                 }
             }
         }
@@ -158,6 +170,43 @@ class DashboardViewModel @Inject constructor(
                         it.copy(
                             isStoppingAll = false,
                             errorMessage = null,
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    fun deleteAllSessionData() {
+        if (_uiState.value.isDeletingSessionData) {
+            return
+        }
+
+        viewModelScope.launch {
+            _uiState.update {
+                it.copy(
+                    isDeletingSessionData = true,
+                    errorMessage = null,
+                    sessionDeleteMessage = null,
+                )
+            }
+
+            when (val result = deleteAllSessionDataUseCase()) {
+                is AppResult.Failure -> {
+                    _uiState.update {
+                        it.copy(
+                            isDeletingSessionData = false,
+                            errorMessage = result.error.toUserMessage(),
+                        )
+                    }
+                }
+
+                is AppResult.Success -> {
+                    _uiState.update {
+                        it.copy(
+                            isDeletingSessionData = false,
+                            errorMessage = null,
+                            sessionDeleteMessage = "All conversations deleted.",
                         )
                     }
                 }

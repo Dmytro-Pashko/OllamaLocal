@@ -1,5 +1,6 @@
 package com.dpashko.localaiclient.data.repositories
 
+import android.content.Context
 import androidx.room.withTransaction
 import com.dpashko.localaiclient.data.database.LocalAiClientDatabase
 import com.dpashko.localaiclient.data.database.dao.ConversationDao
@@ -13,12 +14,15 @@ import com.dpashko.localaiclient.domain.models.conversation.Message
 import com.dpashko.localaiclient.domain.models.conversation.MessageRole
 import com.dpashko.localaiclient.domain.models.conversation.MessageStatus
 import com.dpashko.localaiclient.domain.models.error.AppError
+import com.dpashko.localaiclient.domain.models.storage.StoragePrivacyStats
 import com.dpashko.localaiclient.domain.repositories.ConversationRepository
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 
 class ConversationRepositoryImpl @Inject constructor(
+    @param:ApplicationContext private val context: Context,
     private val database: LocalAiClientDatabase,
     private val conversationDao: ConversationDao,
 ) : ConversationRepository {
@@ -49,6 +53,18 @@ class ConversationRepositoryImpl @Inject constructor(
     override fun observeActiveGenerations() =
         conversationDao.observeActiveGenerations()
             .map { generations -> generations.map { it.toDomain() } }
+
+    override fun observeStoragePrivacyStats(): Flow<StoragePrivacyStats> =
+        conversationDao.observeStoragePrivacyStats()
+            .map { stats ->
+                StoragePrivacyStats(
+                    activeConversationCount = stats.activeConversationCount,
+                    archivedConversationCount = stats.archivedConversationCount,
+                    messageCount = stats.messageCount,
+                    activeGenerationCount = stats.activeGenerationCount,
+                    databaseSizeBytes = databaseSizeBytes(),
+                )
+            }
 
     override fun observeConversationSettings(conversationId: Long): Flow<ConversationSettings?> =
         conversationDao.observeConversationSettings(conversationId)
@@ -390,7 +406,12 @@ class ConversationRepositoryImpl @Inject constructor(
             ?.ifBlank { null }
             ?: "New conversation"
 
+    private fun databaseSizeBytes(): Long =
+        listOf("", "-wal", "-shm")
+            .sumOf { suffix -> context.getDatabasePath(DATABASE_NAME + suffix).length() }
+
     private companion object {
+        const val DATABASE_NAME = "local_ai_client.db"
         const val MAX_TITLE_LENGTH = 48
         const val CANCELED_GENERATION_MESSAGE = "Generation stopped."
     }

@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ListItem
@@ -21,6 +22,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -28,6 +30,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.dpashko.localaiclient.domain.models.connection.AiProvider
 import com.dpashko.localaiclient.domain.models.connection.ProviderDiagnostics
+import com.dpashko.localaiclient.domain.models.storage.StoragePrivacyStats
 import com.dpashko.localaiclient.presentation.common.toConversationTimeText
 
 @Composable
@@ -44,6 +47,7 @@ fun DashboardRoute(
         onStopGeneration = viewModel::stopGeneration,
         onStopAllGenerations = viewModel::stopAllGenerations,
         onRefreshProviderDiagnostics = viewModel::refreshProviderDiagnostics,
+        onDeleteAllSessionData = viewModel::deleteAllSessionData,
         onOpenConversation = onOpenConversation,
     )
 }
@@ -55,9 +59,34 @@ private fun DashboardScreen(
     onStopGeneration: (Long) -> Unit,
     onStopAllGenerations: () -> Unit,
     onRefreshProviderDiagnostics: () -> Unit,
+    onDeleteAllSessionData: () -> Unit,
     onOpenConversation: (AiProvider, String, Int, String, Long) -> Unit,
 ) {
     var nowMillis by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    var isDeleteAllDialogVisible by remember { mutableStateOf(false) }
+
+    if (isDeleteAllDialogVisible) {
+        AlertDialog(
+            onDismissRequest = { isDeleteAllDialogVisible = false },
+            title = { Text("Delete all conversations?") },
+            text = { Text("This permanently deletes all conversations and messages on this device.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        isDeleteAllDialogVisible = false
+                        onDeleteAllSessionData()
+                    },
+                ) {
+                    Text("Delete all")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { isDeleteAllDialogVisible = false }) {
+                    Text("Cancel")
+                }
+            },
+        )
+    }
 
     LaunchedEffect(state.activeGenerations.isNotEmpty()) {
         while (state.activeGenerations.isNotEmpty()) {
@@ -127,12 +156,60 @@ private fun DashboardScreen(
                 onRefresh = onRefreshProviderDiagnostics,
             )
 
+            StoragePrivacySection(
+                stats = state.storagePrivacyStats,
+                isDeleting = state.isDeletingSessionData,
+                deleteMessage = state.sessionDeleteMessage,
+                onDeleteAll = { isDeleteAllDialogVisible = true },
+            )
+
             state.errorMessage?.let { error ->
                 Text(
                     text = error,
                     color = MaterialTheme.colorScheme.error,
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun StoragePrivacySection(
+    stats: StoragePrivacyStats?,
+    isDeleting: Boolean,
+    deleteMessage: String?,
+    onDeleteAll: () -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = "Local storage",
+                style = MaterialTheme.typography.titleLarge,
+            )
+            Button(
+                onClick = onDeleteAll,
+                enabled = !isDeleting,
+            ) {
+                Text("Delete all")
+            }
+        }
+
+        if (stats == null) {
+            Text("Loading storage details")
+        } else {
+            Text("Active conversations: ${stats.activeConversationCount}")
+            Text("Archived conversations: ${stats.archivedConversationCount}")
+            Text("Messages: ${stats.messageCount}")
+            Text("Active generations: ${stats.activeGenerationCount}")
+            Text("Local database: ${stats.databaseSizeBytes.toReadableSize()}")
+        }
+
+        deleteMessage?.let { message ->
+            Text(message)
         }
     }
 }
@@ -214,4 +291,15 @@ private fun formatElapsedTime(elapsedMillis: Long): String {
     val minutes = totalSeconds / 60
     val seconds = totalSeconds % 60
     return "%d:%02d".format(minutes, seconds)
+}
+
+private fun Long.toReadableSize(): String {
+    if (this < 1_024L) {
+        return "$this B"
+    }
+    val kib = this / 1_024.0
+    if (kib < 1_024.0) {
+        return "%.1f KB".format(kib)
+    }
+    return "%.1f MB".format(kib / 1_024.0)
 }

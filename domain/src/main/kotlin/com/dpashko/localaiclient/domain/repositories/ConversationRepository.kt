@@ -5,6 +5,7 @@ import com.dpashko.localaiclient.domain.models.conversation.ActiveGeneration
 import com.dpashko.localaiclient.domain.models.conversation.Conversation
 import com.dpashko.localaiclient.domain.models.conversation.ConversationSettings
 import com.dpashko.localaiclient.domain.models.conversation.Message
+import com.dpashko.localaiclient.domain.models.storage.StoragePrivacyStats
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -43,6 +44,11 @@ interface ConversationRepository {
      * Observes all conversations with active assistant generation.
      */
     fun observeActiveGenerations(): Flow<List<ActiveGeneration>>
+
+    /**
+     * Observes local storage and privacy counters.
+     */
+    fun observeStoragePrivacyStats(): Flow<StoragePrivacyStats>
 
     /**
      * Observes generation settings stored for one conversation.
