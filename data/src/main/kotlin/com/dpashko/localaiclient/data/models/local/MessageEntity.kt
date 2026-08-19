@@ -22,6 +22,7 @@ import com.dpashko.localaiclient.domain.models.conversation.MessageStatus
     ],
     indices = [
         Index(value = ["conversationId"]),
+        Index(value = ["branchId"]),
     ],
 )
 data class MessageEntity(
@@ -30,6 +31,8 @@ data class MessageEntity(
     val id: Long = 0L,
     /** Parent conversation id. */
     val conversationId: Long,
+    /** Parent branch id. */
+    val branchId: Long = 0L,
     /** Sender role for UI rendering and provider request mapping. */
     val role: MessageRole,
     /** Message body stored on device. */

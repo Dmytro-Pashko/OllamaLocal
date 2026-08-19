@@ -240,6 +240,7 @@ class GenerateAssistantMessageWorker @AssistedInject constructor(
             Message(
                 id = 0L,
                 conversationId = 0L,
+                branchId = 0L,
                 role = MessageRole.SYSTEM,
                 content = trimmedPrompt,
                 status = MessageStatus.SENT,

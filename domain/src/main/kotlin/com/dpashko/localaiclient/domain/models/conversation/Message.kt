@@ -8,6 +8,8 @@ data class Message(
     val id: Long,
     /** Owning conversation identifier. */
     val conversationId: Long,
+    /** Owning branch identifier inside the conversation. */
+    val branchId: Long,
     /** Sender role used for rendering and provider request mapping. */
     val role: MessageRole,
     /** Message body stored locally and sent as context when eligible. */

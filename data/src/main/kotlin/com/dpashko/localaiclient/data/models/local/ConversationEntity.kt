@@ -27,6 +27,8 @@ data class ConversationEntity(
     val generationTimeoutMillis: Long,
     /** Optional system instruction prepended to provider context. */
     val systemPrompt: String = "",
+    /** Branch currently visible and used for generation context. */
+    val activeBranchId: Long = 0L,
     /** Creation timestamp in epoch milliseconds. */
     val createdAtMillis: Long,
     /** Last update timestamp in epoch milliseconds. */

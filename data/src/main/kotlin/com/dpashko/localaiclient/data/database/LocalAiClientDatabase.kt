@@ -5,6 +5,7 @@ import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.dpashko.localaiclient.data.database.dao.ConversationDao
+import com.dpashko.localaiclient.data.models.local.ConversationBranchEntity
 import com.dpashko.localaiclient.data.models.local.ConversationEntity
 import com.dpashko.localaiclient.data.models.local.MessageEntity
 import com.dpashko.localaiclient.domain.models.settings.GenerationSettings
@@ -15,9 +16,10 @@ import com.dpashko.localaiclient.domain.models.settings.GenerationSettings
 @Database(
     entities = [
         ConversationEntity::class,
+        ConversationBranchEntity::class,
         MessageEntity::class,
     ],
-    version = 6,
+    version = 7,
     exportSchema = false,
 )
 abstract class LocalAiClientDatabase : RoomDatabase() {
@@ -77,6 +79,41 @@ abstract class LocalAiClientDatabase : RoomDatabase() {
                         GenerationSettings.DEFAULT_GENERATION_TIMEOUT_MILLIS,
                 )
                 db.execSQL("ALTER TABLE conversations ADD COLUMN systemPrompt TEXT NOT NULL DEFAULT ''")
+            }
+        }
+
+        /**
+         * Adds branch metadata and assigns existing chats to one main branch.
+         */
+        val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS conversation_branches (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        conversationId INTEGER NOT NULL,
+                        title TEXT NOT NULL,
+                        createdAtMillis INTEGER NOT NULL,
+                        updatedAtMillis INTEGER NOT NULL,
+                        FOREIGN KEY(conversationId) REFERENCES conversations(id) ON UPDATE NO ACTION ON DELETE CASCADE
+                    )
+                    """.trimIndent(),
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_conversation_branches_conversationId " +
+                        "ON conversation_branches(conversationId)",
+                )
+                db.execSQL("ALTER TABLE conversations ADD COLUMN activeBranchId INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE messages ADD COLUMN branchId INTEGER NOT NULL DEFAULT 0")
+                db.execSQL(
+                    """
+                    INSERT INTO conversation_branches(id, conversationId, title, createdAtMillis, updatedAtMillis)
+                    SELECT id, id, 'Main', createdAtMillis, updatedAtMillis FROM conversations
+                    """.trimIndent(),
+                )
+                db.execSQL("UPDATE conversations SET activeBranchId = id")
+                db.execSQL("UPDATE messages SET branchId = conversationId")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_messages_branchId ON messages(branchId)")
             }
         }
     }

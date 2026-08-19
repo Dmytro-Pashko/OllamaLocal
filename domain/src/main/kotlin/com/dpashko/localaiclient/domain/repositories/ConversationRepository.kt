@@ -3,6 +3,7 @@ package com.dpashko.localaiclient.domain.repositories
 import com.dpashko.localaiclient.domain.models.common.AppResult
 import com.dpashko.localaiclient.domain.models.conversation.ActiveGeneration
 import com.dpashko.localaiclient.domain.models.conversation.Conversation
+import com.dpashko.localaiclient.domain.models.conversation.ConversationBranch
 import com.dpashko.localaiclient.domain.models.conversation.ConversationSettings
 import com.dpashko.localaiclient.domain.models.conversation.Message
 import com.dpashko.localaiclient.domain.models.storage.StoragePrivacyStats
@@ -34,6 +35,11 @@ interface ConversationRepository {
      * Observes all messages that belong to [conversationId].
      */
     fun observeMessages(conversationId: Long): Flow<List<Message>>
+
+    /**
+     * Observes available branches for one conversation.
+     */
+    fun observeConversationBranches(conversationId: Long): Flow<List<ConversationBranch>>
 
     /**
      * Observes whether [conversationId] currently has a generating assistant placeholder.
@@ -184,6 +190,22 @@ interface ConversationRepository {
      * Resets an existing assistant message so it can be generated again.
      */
     suspend fun regenerateAssistantMessage(messageId: Long): AppResult<Unit>
+
+    /**
+     * Switches the visible timeline for one conversation.
+     */
+    suspend fun switchConversationBranch(
+        conversationId: Long,
+        branchId: Long,
+    ): AppResult<Unit>
+
+    /**
+     * Copies the active timeline through a user message into a new branch.
+     */
+    suspend fun createBranchFromUserMessage(
+        conversationId: Long,
+        messageId: Long,
+    ): AppResult<Long>
 
     /**
      * Updates a user message and removes newer messages so regeneration uses the edited context.

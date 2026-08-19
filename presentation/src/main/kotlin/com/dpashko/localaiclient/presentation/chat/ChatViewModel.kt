@@ -8,8 +8,10 @@ import com.dpashko.localaiclient.domain.models.common.AppResult
 import com.dpashko.localaiclient.domain.models.connection.AiProvider
 import com.dpashko.localaiclient.domain.models.connection.ConnectionConfig
 import com.dpashko.localaiclient.domain.models.conversation.ConversationSettings
+import com.dpashko.localaiclient.domain.usecases.CreateMessageBranchUseCase
 import com.dpashko.localaiclient.domain.usecases.EditMessageAndRegenerateUseCase
 import com.dpashko.localaiclient.domain.usecases.EstimateConversationContextUseCase
+import com.dpashko.localaiclient.domain.usecases.ObserveConversationBranchesUseCase
 import com.dpashko.localaiclient.domain.usecases.ObserveConversationSettingsUseCase
 import com.dpashko.localaiclient.domain.usecases.ObserveHasGeneratingMessageUseCase
 import com.dpashko.localaiclient.domain.usecases.ObserveMessagesUseCase
@@ -18,6 +20,7 @@ import com.dpashko.localaiclient.domain.usecases.RetryGenerationUseCase
 import com.dpashko.localaiclient.domain.usecases.SaveConversationSettingsUseCase
 import com.dpashko.localaiclient.domain.usecases.SendMessageUseCase
 import com.dpashko.localaiclient.domain.usecases.StopGenerationUseCase
+import com.dpashko.localaiclient.domain.usecases.SwitchConversationBranchUseCase
 import com.dpashko.localaiclient.presentation.Routes
 import com.dpashko.localaiclient.presentation.common.toUserMessage
 import com.dpashko.localaiclient.presentation.ui.models.toUi
@@ -36,12 +39,15 @@ import javax.inject.Inject
 class ChatViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val observeMessagesUseCase: ObserveMessagesUseCase,
+    private val observeConversationBranchesUseCase: ObserveConversationBranchesUseCase,
     private val observeHasGeneratingMessageUseCase: ObserveHasGeneratingMessageUseCase,
     private val observeConversationSettingsUseCase: ObserveConversationSettingsUseCase,
     private val estimateConversationContextUseCase: EstimateConversationContextUseCase,
     private val sendMessageUseCase: SendMessageUseCase,
     private val retryGenerationUseCase: RetryGenerationUseCase,
     private val regenerateLastAssistantResponseUseCase: RegenerateLastAssistantResponseUseCase,
+    private val createMessageBranchUseCase: CreateMessageBranchUseCase,
+    private val switchConversationBranchUseCase: SwitchConversationBranchUseCase,
     private val editMessageAndRegenerateUseCase: EditMessageAndRegenerateUseCase,
     private val stopGenerationUseCase: StopGenerationUseCase,
     private val saveConversationSettingsUseCase: SaveConversationSettingsUseCase,
@@ -95,6 +101,14 @@ class ChatViewModel @Inject constructor(
                     )
                 }
                 refreshContextEstimate()
+            }
+        }
+
+        viewModelScope.launch {
+            observeConversationBranchesUseCase(conversationId).collect { branches ->
+                _uiState.update {
+                    it.copy(branches = branches)
+                }
             }
         }
     }
@@ -430,6 +444,81 @@ class ChatViewModel @Inject constructor(
                             errorMessage = null,
                         )
                     }
+                }
+            }
+        }
+    }
+
+    /**
+     * Creates an alternative branch from a user message and starts a fresh assistant response.
+     */
+    fun branchFromMessage(userMessageId: Long) {
+        if (_uiState.value.isSending || _uiState.value.hasGeneratingMessage) {
+            return
+        }
+
+        viewModelScope.launch {
+            _uiState.update {
+                it.copy(
+                    isSending = true,
+                    errorMessage = null,
+                )
+            }
+
+            val result = createMessageBranchUseCase(
+                config = ConnectionConfig(
+                    provider = provider,
+                    host = host,
+                    port = port,
+                ),
+                conversationId = conversationId,
+                userMessageId = userMessageId,
+            )
+
+            when (result) {
+                is AppResult.Failure -> {
+                    _uiState.update {
+                        it.copy(
+                            isSending = false,
+                            errorMessage = result.error.toUserMessage(),
+                        )
+                    }
+                }
+
+                is AppResult.Success -> {
+                    _uiState.update {
+                        it.copy(
+                            isSending = false,
+                            errorMessage = null,
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Switches the visible branch for this conversation.
+     */
+    fun switchBranch(branchId: Long) {
+        if (_uiState.value.isSending || _uiState.value.hasGeneratingMessage) {
+            return
+        }
+
+        viewModelScope.launch {
+            when (
+                val result = switchConversationBranchUseCase(
+                    conversationId = conversationId,
+                    branchId = branchId,
+                )
+            ) {
+                is AppResult.Failure -> {
+                    _uiState.update { it.copy(errorMessage = result.error.toUserMessage()) }
+                }
+
+                is AppResult.Success -> {
+                    _uiState.update { it.copy(errorMessage = null) }
+                    refreshContextEstimate()
                 }
             }
         }

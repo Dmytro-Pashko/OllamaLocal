@@ -77,6 +77,8 @@ fun ChatRoute(
         onEditClick = { message -> viewModel.startEditingMessage(message.id, message.content) },
         onRetryClick = viewModel::retryGeneration,
         onRegenerateLastAssistantResponse = viewModel::regenerateLastAssistantResponse,
+        onBranchFromMessage = viewModel::branchFromMessage,
+        onSwitchBranch = viewModel::switchBranch,
         onStopGenerationClick = viewModel::stopGeneration,
         onSearchQueryChanged = viewModel::onChatSearchQueryChanged,
         onPreviousSearchMatch = viewModel::moveToPreviousSearchMatch,
@@ -96,6 +98,8 @@ private fun ChatScreen(
     onEditClick: (MessageUi) -> Unit,
     onRetryClick: (Long) -> Unit,
     onRegenerateLastAssistantResponse: () -> Unit,
+    onBranchFromMessage: (Long) -> Unit,
+    onSwitchBranch: (Long) -> Unit,
     onStopGenerationClick: () -> Unit,
     onSearchQueryChanged: (String) -> Unit,
     onPreviousSearchMatch: () -> Unit,
@@ -241,7 +245,7 @@ private fun ChatScreen(
                         Column {
                             Text("Conversation")
                             Text(
-                                text = state.modelName,
+                                text = listOfNotNull(state.modelName, state.activeBranchTitle).joinToString(" • "),
                                 style = MaterialTheme.typography.bodySmall,
                             )
                         }
@@ -310,6 +314,24 @@ private fun ChatScreen(
                                 },
                                 enabled = hasAssistantResponse && !state.isSending && !state.hasGeneratingMessage,
                             )
+                            state.branches.forEach { branch ->
+                                DropdownMenuItem(
+                                    text = {
+                                        Text(
+                                            if (branch.isActive) {
+                                                "${branch.title} selected"
+                                            } else {
+                                                "Switch to ${branch.title}"
+                                            },
+                                        )
+                                    },
+                                    onClick = {
+                                        isToolbarMenuExpanded = false
+                                        onSwitchBranch(branch.id)
+                                    },
+                                    enabled = !branch.isActive && !state.isSending && !state.hasGeneratingMessage,
+                                )
+                            }
                             DropdownMenuItem(
                                 text = { Text("Settings") },
                                 leadingIcon = {
@@ -418,12 +440,16 @@ private fun ChatScreen(
                                         snackbarHostState.showSnackbar("Message copied")
                                     }
                                 },
-                                onEditClick = {
-                                    actionMessage = null
-                                    onEditClick(message)
-                                },
-                                onRetryClick = onRetryClick,
-                            )
+                            onEditClick = {
+                                actionMessage = null
+                                onEditClick(message)
+                            },
+                            onBranchClick = {
+                                actionMessage = null
+                                onBranchFromMessage(message.id)
+                            },
+                            onRetryClick = onRetryClick,
+                        )
                         }
                     }
                 }
@@ -482,6 +508,7 @@ private fun MessageBubble(
     onDismissActionsMenu: () -> Unit,
     onCopyClick: () -> Unit,
     onEditClick: () -> Unit,
+    onBranchClick: () -> Unit,
     onRetryClick: (Long) -> Unit,
 ) {
     val isUser = message.role == MessageRole.USER
@@ -558,6 +585,10 @@ private fun MessageBubble(
                     DropdownMenuItem(
                         text = { Text("Edit") },
                         onClick = onEditClick,
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Branch from here") },
+                        onClick = onBranchClick,
                     )
                 }
             }

@@ -5,6 +5,7 @@ import androidx.room.withTransaction
 import com.dpashko.localaiclient.data.database.LocalAiClientDatabase
 import com.dpashko.localaiclient.data.database.dao.ConversationDao
 import com.dpashko.localaiclient.data.mappers.toDomain
+import com.dpashko.localaiclient.data.models.local.ConversationBranchEntity
 import com.dpashko.localaiclient.data.models.local.ConversationEntity
 import com.dpashko.localaiclient.data.models.local.MessageEntity
 import com.dpashko.localaiclient.domain.models.common.AppResult
@@ -18,6 +19,7 @@ import com.dpashko.localaiclient.domain.models.storage.StoragePrivacyStats
 import com.dpashko.localaiclient.domain.repositories.ConversationRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 
@@ -46,6 +48,15 @@ class ConversationRepositoryImpl @Inject constructor(
     override fun observeMessages(conversationId: Long): Flow<List<Message>> =
         conversationDao.observeMessages(conversationId)
             .map { messages -> messages.map { it.toDomain() } }
+
+    override fun observeConversationBranches(conversationId: Long) =
+        combine(
+            conversationDao.observeConversationBranches(conversationId),
+            conversationDao.observeConversationSettings(conversationId),
+        ) { branches, _ ->
+            val activeBranchId = conversationDao.getActiveBranchId(conversationId) ?: 0L
+            branches.map { it.toDomain(activeBranchId) }
+        }
 
     override fun observeHasGeneratingMessage(conversationId: Long): Flow<Boolean> =
         conversationDao.observeHasGeneratingMessage(conversationId)
@@ -92,20 +103,36 @@ class ConversationRepositoryImpl @Inject constructor(
     ): AppResult<Long> =
         safeDatabaseCall {
             val now = System.currentTimeMillis()
-            conversationDao.insertConversation(
-                ConversationEntity(
-                    title = "New conversation",
-                    isPinned = false,
-                    isTitleManuallyEdited = false,
-                    isArchived = false,
-                    archivedAtMillis = null,
-                    modelName = modelName,
-                    generationTimeoutMillis = generationTimeoutMillis,
-                    systemPrompt = "",
-                    createdAtMillis = now,
-                    updatedAtMillis = now,
-                ),
-            )
+            database.withTransaction {
+                val conversationId = conversationDao.insertConversation(
+                    ConversationEntity(
+                        title = "New conversation",
+                        isPinned = false,
+                        isTitleManuallyEdited = false,
+                        isArchived = false,
+                        archivedAtMillis = null,
+                        modelName = modelName,
+                        generationTimeoutMillis = generationTimeoutMillis,
+                        systemPrompt = "",
+                        activeBranchId = 0L,
+                        createdAtMillis = now,
+                        updatedAtMillis = now,
+                    ),
+                )
+                val branchId = conversationDao.insertConversationBranch(
+                    ConversationBranchEntity(
+                        conversationId = conversationId,
+                        title = "Main",
+                        createdAtMillis = now,
+                        updatedAtMillis = now,
+                    ),
+                )
+                conversationDao.updateActiveBranch(
+                    conversationId = conversationId,
+                    branchId = branchId,
+                )
+                conversationId
+            }
         }
 
     override suspend fun deleteConversation(conversationId: Long): AppResult<Unit> =
@@ -188,9 +215,12 @@ class ConversationRepositoryImpl @Inject constructor(
         safeDatabaseCall {
             val messageCount = conversationDao.getMessageCount(conversationId)
             val now = System.currentTimeMillis()
+            val branchId = conversationDao.getActiveBranchId(conversationId)
+                ?: throw IllegalStateException("Conversation branch cannot be loaded.")
             val messageId = conversationDao.insertMessage(
                 MessageEntity(
                     conversationId = conversationId,
+                    branchId = branchId,
                     role = MessageRole.USER,
                     content = content,
                     status = MessageStatus.SENT,
@@ -224,9 +254,12 @@ class ConversationRepositoryImpl @Inject constructor(
     override suspend fun addAssistantPlaceholder(conversationId: Long): AppResult<Long> =
         safeDatabaseCall {
             val now = System.currentTimeMillis()
+            val branchId = conversationDao.getActiveBranchId(conversationId)
+                ?: throw IllegalStateException("Conversation branch cannot be loaded.")
             val messageId = conversationDao.insertMessage(
                 MessageEntity(
                     conversationId = conversationId,
+                    branchId = branchId,
                     role = MessageRole.ASSISTANT,
                     content = "",
                     status = MessageStatus.GENERATING,
@@ -338,6 +371,86 @@ class ConversationRepositoryImpl @Inject constructor(
                 throw IllegalStateException("Message cannot be regenerated.")
             }
             updateConversationTimestampForMessage(messageId)
+        }
+
+    override suspend fun switchConversationBranch(
+        conversationId: Long,
+        branchId: Long,
+    ): AppResult<Unit> =
+        safeDatabaseCall {
+            val updatedRows = conversationDao.updateActiveBranch(
+                conversationId = conversationId,
+                branchId = branchId,
+            )
+            if (updatedRows == 0) {
+                throw IllegalStateException("Conversation branch cannot be selected.")
+            }
+            conversationDao.updateConversationTimestamp(
+                conversationId = conversationId,
+                updatedAtMillis = System.currentTimeMillis(),
+            )
+        }
+
+    override suspend fun createBranchFromUserMessage(
+        conversationId: Long,
+        messageId: Long,
+    ): AppResult<Long> =
+        safeDatabaseCall {
+            database.withTransaction {
+                val sourceMessage = conversationDao.getMessage(messageId)
+                    ?: throw IllegalStateException("Message cannot be branched.")
+                val activeBranchId = conversationDao.getActiveBranchId(conversationId)
+                    ?: throw IllegalStateException("Conversation branch cannot be loaded.")
+                if (
+                    sourceMessage.conversationId != conversationId ||
+                    sourceMessage.branchId != activeBranchId ||
+                    sourceMessage.role != MessageRole.USER
+                ) {
+                    throw IllegalStateException("Branch can only start from a user message.")
+                }
+
+                val now = System.currentTimeMillis()
+                val branchNumber = conversationDao.getBranchCount(conversationId) + 1
+                val branchId = conversationDao.insertConversationBranch(
+                    ConversationBranchEntity(
+                        conversationId = conversationId,
+                        title = "Branch $branchNumber",
+                        createdAtMillis = now,
+                        updatedAtMillis = now,
+                    ),
+                )
+                val copiedMessages = conversationDao.getActiveBranchMessagesThrough(
+                    conversationId = conversationId,
+                    createdAtMillis = sourceMessage.createdAtMillis,
+                    messageId = sourceMessage.id,
+                ).map { message ->
+                    message.copy(
+                        id = 0L,
+                        branchId = branchId,
+                    )
+                }
+                conversationDao.insertMessages(copiedMessages)
+                val assistantMessageId = conversationDao.insertMessage(
+                    MessageEntity(
+                        conversationId = conversationId,
+                        branchId = branchId,
+                        role = MessageRole.ASSISTANT,
+                        content = "",
+                        status = MessageStatus.GENERATING,
+                        errorMessage = null,
+                        createdAtMillis = now,
+                    ),
+                )
+                conversationDao.updateActiveBranch(
+                    conversationId = conversationId,
+                    branchId = branchId,
+                )
+                conversationDao.updateConversationTimestamp(
+                    conversationId = conversationId,
+                    updatedAtMillis = now,
+                )
+                assistantMessageId
+            }
         }
 
     override suspend fun editUserMessageAndDeleteNewer(

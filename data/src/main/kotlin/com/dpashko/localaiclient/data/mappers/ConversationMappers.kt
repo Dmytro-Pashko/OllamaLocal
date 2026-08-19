@@ -1,11 +1,13 @@
 package com.dpashko.localaiclient.data.mappers
 
 import com.dpashko.localaiclient.data.models.local.ActiveGenerationEntity
+import com.dpashko.localaiclient.data.models.local.ConversationBranchEntity
 import com.dpashko.localaiclient.data.models.local.ConversationListItemEntity
 import com.dpashko.localaiclient.data.models.local.ConversationSettingsEntity
 import com.dpashko.localaiclient.data.models.local.MessageEntity
 import com.dpashko.localaiclient.domain.models.conversation.ActiveGeneration
 import com.dpashko.localaiclient.domain.models.conversation.Conversation
+import com.dpashko.localaiclient.domain.models.conversation.ConversationBranch
 import com.dpashko.localaiclient.domain.models.conversation.ConversationSettings
 import com.dpashko.localaiclient.domain.models.conversation.Message
 
@@ -26,6 +28,7 @@ fun MessageEntity.toDomain(): Message =
     Message(
         id = id,
         conversationId = conversationId,
+        branchId = branchId,
         role = role,
         content = content,
         status = status,
@@ -39,6 +42,16 @@ fun ConversationSettingsEntity.toDomain(): ConversationSettings =
         modelName = modelName,
         generationTimeoutMillis = generationTimeoutMillis,
         systemPrompt = systemPrompt,
+    )
+
+fun ConversationBranchEntity.toDomain(activeBranchId: Long): ConversationBranch =
+    ConversationBranch(
+        id = id,
+        conversationId = conversationId,
+        title = title,
+        createdAtMillis = createdAtMillis,
+        updatedAtMillis = updatedAtMillis,
+        isActive = id == activeBranchId,
     )
 
 fun ActiveGenerationEntity.toDomain(): ActiveGeneration =

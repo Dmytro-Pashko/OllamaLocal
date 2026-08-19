@@ -5,6 +5,7 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import com.dpashko.localaiclient.data.models.local.ActiveGenerationEntity
+import com.dpashko.localaiclient.data.models.local.ConversationBranchEntity
 import com.dpashko.localaiclient.data.models.local.ConversationEntity
 import com.dpashko.localaiclient.data.models.local.ConversationListItemEntity
 import com.dpashko.localaiclient.data.models.local.ConversationSettingsEntity
@@ -34,6 +35,7 @@ interface ConversationDao {
             EXISTS(
                 SELECT 1 FROM messages
                 WHERE messages.conversationId = conversations.id
+                    AND messages.branchId = conversations.activeBranchId
                     AND messages.role = 'ASSISTANT'
                     AND messages.status = 'GENERATING'
             ) AS hasGeneratingMessage
@@ -61,6 +63,7 @@ interface ConversationDao {
             EXISTS(
                 SELECT 1 FROM messages
                 WHERE messages.conversationId = conversations.id
+                    AND messages.branchId = conversations.activeBranchId
                     AND messages.role = 'ASSISTANT'
                     AND messages.status = 'GENERATING'
             ) AS hasGeneratingMessage
@@ -73,6 +76,7 @@ interface ConversationDao {
                 OR EXISTS(
                     SELECT 1 FROM messages
                     WHERE messages.conversationId = conversations.id
+                        AND messages.branchId = conversations.activeBranchId
                         AND messages.content LIKE '%' || :query || '%'
                 )
             )
@@ -87,13 +91,29 @@ interface ConversationDao {
     /**
      * Observes all messages for [conversationId] in chronological order.
      */
-    @Query("SELECT * FROM messages WHERE conversationId = :conversationId ORDER BY createdAtMillis ASC, id ASC")
+    @Query(
+        """
+        SELECT messages.* FROM messages
+        INNER JOIN conversations ON conversations.id = messages.conversationId
+        WHERE messages.conversationId = :conversationId
+            AND messages.branchId = conversations.activeBranchId
+        ORDER BY messages.createdAtMillis ASC, messages.id ASC
+        """,
+    )
     fun observeMessages(conversationId: Long): Flow<List<MessageEntity>>
 
     /**
      * Returns all messages for [conversationId] in chronological order.
      */
-    @Query("SELECT * FROM messages WHERE conversationId = :conversationId ORDER BY createdAtMillis ASC, id ASC")
+    @Query(
+        """
+        SELECT messages.* FROM messages
+        INNER JOIN conversations ON conversations.id = messages.conversationId
+        WHERE messages.conversationId = :conversationId
+            AND messages.branchId = conversations.activeBranchId
+        ORDER BY messages.createdAtMillis ASC, messages.id ASC
+        """,
+    )
     suspend fun getMessages(conversationId: Long): List<MessageEntity>
 
     /**
@@ -107,14 +127,34 @@ interface ConversationDao {
      */
     @Query(
         """
-        SELECT * FROM messages
-        WHERE conversationId = :conversationId
+        SELECT messages.* FROM messages
+        INNER JOIN conversations ON conversations.id = messages.conversationId
+        WHERE messages.conversationId = :conversationId
+            AND messages.branchId = conversations.activeBranchId
             AND role = 'ASSISTANT'
-        ORDER BY createdAtMillis DESC, id DESC
+        ORDER BY messages.createdAtMillis DESC, messages.id DESC
         LIMIT 1
         """,
     )
     suspend fun getLatestAssistantMessage(conversationId: Long): MessageEntity?
+
+    /**
+     * Observes all branches for one conversation.
+     */
+    @Query(
+        """
+        SELECT * FROM conversation_branches
+        WHERE conversationId = :conversationId
+        ORDER BY createdAtMillis ASC, id ASC
+        """,
+    )
+    fun observeConversationBranches(conversationId: Long): Flow<List<ConversationBranchEntity>>
+
+    /**
+     * Returns the currently active branch id for a conversation.
+     */
+    @Query("SELECT activeBranchId FROM conversations WHERE id = :conversationId")
+    suspend fun getActiveBranchId(conversationId: Long): Long?
 
     /**
      * Observes editable generation settings for one conversation.
@@ -145,11 +185,13 @@ interface ConversationDao {
      */
     @Query(
         """
-        SELECT * FROM messages
-        WHERE conversationId = :conversationId
+        SELECT messages.* FROM messages
+        INNER JOIN conversations ON conversations.id = messages.conversationId
+        WHERE messages.conversationId = :conversationId
+            AND messages.branchId = conversations.activeBranchId
             AND status = 'SENT'
             AND content != ''
-        ORDER BY createdAtMillis ASC, id ASC
+        ORDER BY messages.createdAtMillis ASC, messages.id ASC
         """,
     )
     suspend fun getContextMessages(conversationId: Long): List<MessageEntity>
@@ -157,7 +199,14 @@ interface ConversationDao {
     /**
      * Counts messages currently stored for [conversationId].
      */
-    @Query("SELECT COUNT(*) FROM messages WHERE conversationId = :conversationId")
+    @Query(
+        """
+        SELECT COUNT(*) FROM messages
+        INNER JOIN conversations ON conversations.id = messages.conversationId
+        WHERE messages.conversationId = :conversationId
+            AND messages.branchId = conversations.activeBranchId
+        """,
+    )
     suspend fun getMessageCount(conversationId: Long): Int
 
     /**
@@ -167,7 +216,9 @@ interface ConversationDao {
         """
         SELECT EXISTS(
             SELECT 1 FROM messages
-            WHERE conversationId = :conversationId
+            INNER JOIN conversations ON conversations.id = messages.conversationId
+            WHERE messages.conversationId = :conversationId
+                AND messages.branchId = conversations.activeBranchId
                 AND role = 'ASSISTANT'
                 AND status = 'GENERATING'
         )
@@ -190,6 +241,7 @@ interface ConversationDao {
         INNER JOIN messages ON messages.conversationId = conversations.id
         WHERE messages.role = 'ASSISTANT'
             AND messages.status = 'GENERATING'
+            AND messages.branchId = conversations.activeBranchId
         GROUP BY conversations.id
         ORDER BY assistantMessageCreatedAtMillis ASC
         """,
@@ -245,10 +297,31 @@ interface ConversationDao {
     suspend fun insertConversation(conversation: ConversationEntity): Long
 
     /**
+     * Inserts a branch and returns the generated id.
+     */
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertConversationBranch(branch: ConversationBranchEntity): Long
+
+    /**
      * Inserts a message and returns the generated id.
      */
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insertMessage(message: MessageEntity): Long
+
+    /**
+     * Inserts copied branch messages.
+     */
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertMessages(messages: List<MessageEntity>)
+
+    /**
+     * Updates active branch for one conversation.
+     */
+    @Query("UPDATE conversations SET activeBranchId = :branchId WHERE id = :conversationId")
+    suspend fun updateActiveBranch(
+        conversationId: Long,
+        branchId: Long,
+    ): Int
 
     /**
      * Updates both display title and last activity timestamp for a conversation.
@@ -417,6 +490,7 @@ interface ConversationDao {
         SET status = 'CANCELED',
             errorMessage = :message
         WHERE conversationId = :conversationId
+            AND branchId = (SELECT activeBranchId FROM conversations WHERE id = :conversationId)
             AND role = 'ASSISTANT'
             AND status = 'GENERATING'
         """,
@@ -435,6 +509,7 @@ interface ConversationDao {
         SET status = 'CANCELED',
             errorMessage = :message
         WHERE conversationId IN (:conversationIds)
+            AND branchId IN (SELECT activeBranchId FROM conversations WHERE id IN (:conversationIds))
             AND role = 'ASSISTANT'
             AND status = 'GENERATING'
         """,
@@ -496,6 +571,7 @@ interface ConversationDao {
             errorMessage = NULL
         WHERE id = :messageId
             AND conversationId = :conversationId
+            AND branchId = (SELECT activeBranchId FROM conversations WHERE id = :conversationId)
             AND role = 'USER'
         """,
     )
@@ -512,6 +588,7 @@ interface ConversationDao {
         """
         DELETE FROM messages
         WHERE conversationId = :conversationId
+            AND branchId = (SELECT activeBranchId FROM conversations WHERE id = :conversationId)
             AND (
                 createdAtMillis > :createdAtMillis
                 OR (createdAtMillis = :createdAtMillis AND id > :messageId)
@@ -531,6 +608,7 @@ interface ConversationDao {
         """
         SELECT COUNT(*) FROM messages
         WHERE conversationId = :conversationId
+            AND branchId = (SELECT activeBranchId FROM conversations WHERE id = :conversationId)
             AND (
                 createdAtMillis < :createdAtMillis
                 OR (createdAtMillis = :createdAtMillis AND id < :messageId)
@@ -542,6 +620,34 @@ interface ConversationDao {
         createdAtMillis: Long,
         messageId: Long,
     ): Int
+
+    /**
+     * Returns messages in the active branch up to and including a message.
+     */
+    @Query(
+        """
+        SELECT messages.* FROM messages
+        INNER JOIN conversations ON conversations.id = messages.conversationId
+        WHERE messages.conversationId = :conversationId
+            AND messages.branchId = conversations.activeBranchId
+            AND (
+                messages.createdAtMillis < :createdAtMillis
+                OR (messages.createdAtMillis = :createdAtMillis AND messages.id <= :messageId)
+            )
+        ORDER BY messages.createdAtMillis ASC, messages.id ASC
+        """,
+    )
+    suspend fun getActiveBranchMessagesThrough(
+        conversationId: Long,
+        createdAtMillis: Long,
+        messageId: Long,
+    ): List<MessageEntity>
+
+    /**
+     * Counts branches owned by one conversation.
+     */
+    @Query("SELECT COUNT(*) FROM conversation_branches WHERE conversationId = :conversationId")
+    suspend fun getBranchCount(conversationId: Long): Int
 
     /**
      * Deletes a conversation; message rows are removed by the Room foreign-key cascade.

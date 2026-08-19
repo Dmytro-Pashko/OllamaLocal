@@ -1,6 +1,7 @@
 package com.dpashko.localaiclient.presentation.chat
 
 import com.dpashko.localaiclient.domain.models.connection.AiProvider
+import com.dpashko.localaiclient.domain.models.conversation.ConversationBranch
 import com.dpashko.localaiclient.domain.models.conversation.ContextEstimate
 import com.dpashko.localaiclient.presentation.ui.models.MessageUi
 
@@ -24,6 +25,8 @@ data class ChatUiState(
     val conversationId: Long = 0L,
     /** Messages rendered in the chat timeline. */
     val messages: List<MessageUi> = emptyList(),
+    /** Available alternative timelines for this conversation. */
+    val branches: List<ConversationBranch> = emptyList(),
     /** Approximate local context size for the next generation. */
     val contextEstimate: ContextEstimate? = null,
     /** Current composer text or draft text for an edited message. */
@@ -46,4 +49,7 @@ data class ChatUiState(
     /** Focused search result message id, or null when there are no matches. */
     val currentSearchMatchMessageId: Long?
         get() = searchMatchMessageIds.getOrNull(currentSearchMatchIndex)
+
+    val activeBranchTitle: String?
+        get() = branches.firstOrNull { it.isActive }?.title
 }
