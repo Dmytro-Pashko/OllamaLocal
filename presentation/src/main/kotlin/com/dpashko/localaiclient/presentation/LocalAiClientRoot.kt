@@ -62,13 +62,7 @@ private fun LocalAiClientNavHost() {
         composable(Routes.Connection) {
             ConnectionRoute(
                 viewModel = hiltViewModel(),
-                onOpenConversations = { provider, host, port, modelName ->
-                    navController.navigate(Routes.connected(provider, host, port, modelName)) {
-                        popUpTo(Routes.Connection) {
-                            inclusive = true
-                        }
-                    }
-                },
+                onBack = navController::popBackStack,
             )
         }
 

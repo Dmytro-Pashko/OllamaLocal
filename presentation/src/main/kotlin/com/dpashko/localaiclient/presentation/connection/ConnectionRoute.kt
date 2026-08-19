@@ -7,6 +7,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -14,12 +16,14 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -34,37 +38,20 @@ import com.dpashko.localaiclient.domain.models.connection.AiProvider
 @Composable
 fun ConnectionRoute(
     viewModel: ConnectionViewModel,
-    onOpenConversations: (AiProvider, String, Int, String) -> Unit,
+    onBack: () -> Unit,
 ) {
     val state by viewModel.uiState.collectAsState()
 
-    LaunchedEffect(
-        state.isConnected,
-        state.selectedModelName,
-    ) {
-        val port = state.port.toIntOrNull()
-        val modelName = state.selectedModelName
-        if (state.isConnected && port != null && modelName != null) {
-            onOpenConversations(state.provider, state.host, port, modelName)
-        }
-    }
-
     ConnectionScreen(
         state = state,
+        onBack = onBack,
         onProviderSelected = viewModel::onProviderSelected,
         onHostChanged = viewModel::onHostChanged,
         onPortChanged = viewModel::onPortChanged,
         onConnectClick = viewModel::connect,
         onRefreshModelsClick = viewModel::refreshModels,
         onModelSelected = viewModel::onModelSelected,
-        onPresetSelected = viewModel::applyPreset,
         onSavePreset = viewModel::saveCurrentAsPreset,
-        onDeletePreset = viewModel::deletePreset,
-        onOpenConversations = {
-            val port = state.port.toIntOrNull() ?: return@ConnectionScreen
-            val modelName = state.selectedModelName ?: return@ConnectionScreen
-            onOpenConversations(state.provider, state.host, port, modelName)
-        },
     )
 }
 
@@ -72,23 +59,19 @@ fun ConnectionRoute(
 @Composable
 private fun ConnectionScreen(
     state: ConnectionUiState,
+    onBack: () -> Unit,
     onProviderSelected: (AiProvider) -> Unit,
     onHostChanged: (String) -> Unit,
     onPortChanged: (String) -> Unit,
     onConnectClick: () -> Unit,
     onRefreshModelsClick: () -> Unit,
     onModelSelected: (String) -> Unit,
-    onPresetSelected: (String) -> Unit,
     onSavePreset: (String) -> Unit,
-    onDeletePreset: (String) -> Unit,
-    onOpenConversations: () -> Unit,
 ) {
     var isProviderMenuExpanded by remember { mutableStateOf(false) }
     var isModelMenuExpanded by remember { mutableStateOf(false) }
-    var isPresetMenuExpanded by remember { mutableStateOf(false) }
     var isSavePresetDialogVisible by remember { mutableStateOf(false) }
     var presetNameText by remember { mutableStateOf("") }
-    val selectedPreset = state.presets.firstOrNull { it.id == state.selectedPresetId }
 
     if (isSavePresetDialogVisible) {
         AlertDialog(
@@ -122,7 +105,21 @@ private fun ConnectionScreen(
         )
     }
 
-    Scaffold { innerPadding ->
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Add server") },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back",
+                        )
+                    }
+                },
+            )
+        },
+    ) { innerPadding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -130,78 +127,6 @@ private fun ConnectionScreen(
                 .padding(24.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Text(
-                text = "Local AI Client",
-                style = MaterialTheme.typography.headlineMedium,
-            )
-
-            Text(
-                text = state.providerHealth.displayText,
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.primary,
-            )
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                ExposedDropdownMenuBox(
-                    modifier = Modifier.weight(1f),
-                    expanded = isPresetMenuExpanded,
-                    onExpandedChange = {
-                        if (!state.isBusy && state.presets.isNotEmpty()) {
-                            isPresetMenuExpanded = !isPresetMenuExpanded
-                        }
-                    },
-                ) {
-                    OutlinedTextField(
-                        modifier = Modifier
-                            .menuAnchor()
-                            .fillMaxWidth(),
-                        value = selectedPreset?.name.orEmpty(),
-                        onValueChange = {},
-                        readOnly = true,
-                        enabled = !state.isBusy && state.presets.isNotEmpty(),
-                        label = { Text("Presets") },
-                        trailingIcon = {
-                            ExposedDropdownMenuDefaults.TrailingIcon(expanded = isPresetMenuExpanded)
-                        },
-                    )
-
-                    ExposedDropdownMenu(
-                        expanded = isPresetMenuExpanded,
-                        onDismissRequest = { isPresetMenuExpanded = false },
-                    ) {
-                        state.presets.forEach { preset ->
-                            DropdownMenuItem(
-                                text = {
-                                    Column {
-                                        Text(preset.name)
-                                        Text(
-                                            text = "${preset.provider.displayName} ${preset.host}:${preset.port}",
-                                            style = MaterialTheme.typography.bodySmall,
-                                        )
-                                    }
-                                },
-                                onClick = {
-                                    onPresetSelected(preset.id)
-                                    isPresetMenuExpanded = false
-                                },
-                            )
-                        }
-                    }
-                }
-
-                TextButton(
-                    onClick = {
-                        state.selectedPresetId?.let(onDeletePreset)
-                    },
-                    enabled = !state.isBusy && state.selectedPresetId != null,
-                ) {
-                    Text("Delete")
-                }
-            }
-
             ExposedDropdownMenuBox(
                 expanded = isProviderMenuExpanded,
                 onExpandedChange = {
@@ -271,10 +196,16 @@ private fun ConnectionScreen(
                 }
             }
 
+            Text(
+                text = state.providerHealth.displayText,
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.primary,
+            )
+
             TextButton(
                 modifier = Modifier.fillMaxWidth(),
                 onClick = {
-                    presetNameText = selectedPreset?.name ?: "${state.provider.displayName} ${state.host}"
+                    presetNameText = "${state.provider.displayName} ${state.host}"
                     isSavePresetDialogVisible = true
                 },
                 enabled = !state.isBusy && state.canSavePreset,
@@ -340,14 +271,6 @@ private fun ConnectionScreen(
                 } else {
                     Text("Refresh models")
                 }
-            }
-
-            Button(
-                modifier = Modifier.fillMaxWidth(),
-                onClick = onOpenConversations,
-                enabled = state.isConnected && state.selectedModelName != null && !state.isBusy,
-            ) {
-                Text("To Conversations")
             }
 
             state.errorMessage?.let { error ->
