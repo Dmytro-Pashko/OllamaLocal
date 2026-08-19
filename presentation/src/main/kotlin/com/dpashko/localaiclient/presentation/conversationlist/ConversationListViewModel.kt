@@ -163,6 +163,29 @@ class ConversationListViewModel @Inject constructor(
     }
 
     /**
+     * Permanently deletes selected conversations one by one so each active generation is canceled first.
+     */
+    fun deleteConversations(conversationIds: Set<Long>) {
+        if (conversationIds.isEmpty()) {
+            return
+        }
+
+        viewModelScope.launch {
+            conversationIds.forEach { conversationId ->
+                when (val result = deleteConversationUseCase(conversationId)) {
+                    is AppResult.Failure -> {
+                        _uiState.update { it.copy(errorMessage = result.error.toUserMessage()) }
+                        return@launch
+                    }
+
+                    is AppResult.Success -> Unit
+                }
+            }
+            _uiState.update { it.copy(errorMessage = null) }
+        }
+    }
+
+    /**
      * Pins or unpins a conversation in the local list.
      */
     fun setConversationPinned(
@@ -183,6 +206,32 @@ class ConversationListViewModel @Inject constructor(
     }
 
     /**
+     * Pins or unpins multiple conversations.
+     */
+    fun setConversationsPinned(
+        conversationIds: Set<Long>,
+        isPinned: Boolean,
+    ) {
+        if (conversationIds.isEmpty()) {
+            return
+        }
+
+        viewModelScope.launch {
+            conversationIds.forEach { conversationId ->
+                when (val result = setConversationPinnedUseCase(conversationId, isPinned)) {
+                    is AppResult.Failure -> {
+                        _uiState.update { it.copy(errorMessage = result.error.toUserMessage()) }
+                        return@launch
+                    }
+
+                    is AppResult.Success -> Unit
+                }
+            }
+            _uiState.update { it.copy(errorMessage = null) }
+        }
+    }
+
+    /**
      * Archives or restores a conversation without deleting its local messages.
      */
     fun setConversationArchived(
@@ -199,6 +248,32 @@ class ConversationListViewModel @Inject constructor(
                     _uiState.update { it.copy(errorMessage = null) }
                 }
             }
+        }
+    }
+
+    /**
+     * Archives or restores multiple conversations.
+     */
+    fun setConversationsArchived(
+        conversationIds: Set<Long>,
+        isArchived: Boolean,
+    ) {
+        if (conversationIds.isEmpty()) {
+            return
+        }
+
+        viewModelScope.launch {
+            conversationIds.forEach { conversationId ->
+                when (val result = setConversationArchivedUseCase(conversationId, isArchived)) {
+                    is AppResult.Failure -> {
+                        _uiState.update { it.copy(errorMessage = result.error.toUserMessage()) }
+                        return@launch
+                    }
+
+                    is AppResult.Success -> Unit
+                }
+            }
+            _uiState.update { it.copy(errorMessage = null) }
         }
     }
 

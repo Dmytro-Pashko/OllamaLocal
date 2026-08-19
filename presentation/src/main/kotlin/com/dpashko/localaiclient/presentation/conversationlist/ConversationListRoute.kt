@@ -2,6 +2,8 @@ package com.dpashko.localaiclient.presentation.conversationlist
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,6 +15,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
@@ -83,9 +86,12 @@ fun ConversationListRoute(
         onSearchQueryChanged = viewModel::onSearchQueryChanged,
         onCreateConversation = viewModel::createConversation,
         onDeleteConversation = viewModel::deleteConversation,
+        onDeleteConversations = viewModel::deleteConversations,
         onRenameConversation = viewModel::renameConversation,
         onSetConversationPinned = viewModel::setConversationPinned,
+        onSetConversationsPinned = viewModel::setConversationsPinned,
         onSetConversationArchived = viewModel::setConversationArchived,
+        onSetConversationsArchived = viewModel::setConversationsArchived,
         onOpenConversation = { conversation ->
             onOpenConversation(
                 state.provider,
@@ -108,14 +114,37 @@ private fun ConversationListScreen(
     onSearchQueryChanged: (String) -> Unit,
     onCreateConversation: () -> Unit,
     onDeleteConversation: (Long) -> Unit,
+    onDeleteConversations: (Set<Long>) -> Unit,
     onRenameConversation: (Long, String) -> Unit,
     onSetConversationPinned: (Long, Boolean) -> Unit,
+    onSetConversationsPinned: (Set<Long>, Boolean) -> Unit,
     onSetConversationArchived: (Long, Boolean) -> Unit,
+    onSetConversationsArchived: (Set<Long>, Boolean) -> Unit,
     onOpenConversation: (ConversationUi) -> Unit,
 ) {
     var pendingDeleteConversation by remember { mutableStateOf<ConversationUi?>(null) }
+    var pendingBulkDeleteIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
     var pendingRenameConversation by remember { mutableStateOf<ConversationUi?>(null) }
     var renameText by remember { mutableStateOf("") }
+    var selectedConversationIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
+    val isSelectionMode = selectedConversationIds.isNotEmpty()
+
+    LaunchedEffect(state.conversations) {
+        val visibleIds = state.conversations.map { it.id }.toSet()
+        selectedConversationIds = selectedConversationIds.intersect(visibleIds)
+    }
+
+    fun clearSelection() {
+        selectedConversationIds = emptySet()
+    }
+
+    fun toggleSelection(conversationId: Long) {
+        selectedConversationIds = if (conversationId in selectedConversationIds) {
+            selectedConversationIds - conversationId
+        } else {
+            selectedConversationIds + conversationId
+        }
+    }
 
     pendingDeleteConversation?.let { conversation ->
         AlertDialog(
@@ -134,6 +163,30 @@ private fun ConversationListScreen(
             },
             dismissButton = {
                 TextButton(onClick = { pendingDeleteConversation = null }) {
+                    Text("Cancel")
+                }
+            },
+        )
+    }
+
+    if (pendingBulkDeleteIds.isNotEmpty()) {
+        AlertDialog(
+            onDismissRequest = { pendingBulkDeleteIds = emptySet() },
+            title = { Text("Delete conversations?") },
+            text = { Text("Selected conversations will be permanently deleted from this device.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        onDeleteConversations(pendingBulkDeleteIds)
+                        pendingBulkDeleteIds = emptySet()
+                        clearSelection()
+                    },
+                ) {
+                    Text("Delete")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingBulkDeleteIds = emptySet() }) {
                     Text("Cancel")
                 }
             },
@@ -179,7 +232,9 @@ private fun ConversationListScreen(
             TopAppBar(
                 title = {
                     Text(
-                        if (state.isArchive) {
+                        if (isSelectionMode) {
+                            "${selectedConversationIds.size} selected"
+                        } else if (state.isArchive) {
                             "Archive"
                         } else {
                             "${state.provider.displayName} (${state.host})"
@@ -187,17 +242,50 @@ private fun ConversationListScreen(
                     )
                 },
                 actions = {
-                    TextButton(
-                        onClick = onOpenSettings,
-                        enabled = !state.isDisconnecting,
-                    ) {
-                        Text("Settings")
-                    }
-                    TextButton(
-                        onClick = onDisconnect,
-                        enabled = !state.isDisconnecting,
-                    ) {
-                        Text("Disconnect")
+                    if (isSelectionMode) {
+                        TextButton(
+                            onClick = {
+                                onSetConversationsPinned(selectedConversationIds, true)
+                                clearSelection()
+                            },
+                        ) {
+                            Text("Pin")
+                        }
+                        TextButton(
+                            onClick = {
+                                onSetConversationsPinned(selectedConversationIds, false)
+                                clearSelection()
+                            },
+                        ) {
+                            Text("Unpin")
+                        }
+                        TextButton(
+                            onClick = {
+                                onSetConversationsArchived(selectedConversationIds, !state.isArchive)
+                                clearSelection()
+                            },
+                        ) {
+                            Text(if (state.isArchive) "Unarchive" else "Archive")
+                        }
+                        TextButton(onClick = { pendingBulkDeleteIds = selectedConversationIds }) {
+                            Text("Delete")
+                        }
+                        TextButton(onClick = ::clearSelection) {
+                            Text("Cancel")
+                        }
+                    } else {
+                        TextButton(
+                            onClick = onOpenSettings,
+                            enabled = !state.isDisconnecting,
+                        ) {
+                            Text("Settings")
+                        }
+                        TextButton(
+                            onClick = onDisconnect,
+                            enabled = !state.isDisconnecting,
+                        ) {
+                            Text("Disconnect")
+                        }
                     }
                 },
             )
@@ -269,7 +357,16 @@ private fun ConversationListScreen(
                                 onToggleArchived = {
                                     onSetConversationArchived(conversation.id, !conversation.isArchived)
                                 },
-                                onOpen = { onOpenConversation(conversation) },
+                                isSelectionMode = isSelectionMode,
+                                isSelected = conversation.id in selectedConversationIds,
+                                onSelect = { toggleSelection(conversation.id) },
+                                onOpen = {
+                                    if (isSelectionMode) {
+                                        toggleSelection(conversation.id)
+                                    } else {
+                                        onOpenConversation(conversation)
+                                    }
+                                },
                             )
                         }
                     }
@@ -289,7 +386,7 @@ private fun ConversationListScreen(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
 private fun SwipeConversationItem(
     conversation: ConversationUi,
@@ -297,6 +394,9 @@ private fun SwipeConversationItem(
     onRenameRequest: () -> Unit,
     onTogglePinned: () -> Unit,
     onToggleArchived: () -> Unit,
+    isSelectionMode: Boolean,
+    isSelected: Boolean,
+    onSelect: () -> Unit,
     onOpen: () -> Unit,
 ) {
     val dismissState = rememberSwipeToDismissBoxState(
@@ -332,10 +432,21 @@ private fun SwipeConversationItem(
     ) {
         Column {
             ListItem(
-                modifier = Modifier.clickable(onClick = onOpen),
+                modifier = Modifier.combinedClickable(
+                    onClick = onOpen,
+                    onLongClick = onSelect,
+                ),
                 headlineContent = { Text(conversation.title) },
                 supportingContent = {
                     Text("${conversation.modelName} • ${conversation.updatedAtText}")
+                },
+                leadingContent = {
+                    if (isSelectionMode) {
+                        Checkbox(
+                            checked = isSelected,
+                            onCheckedChange = { onSelect() },
+                        )
+                    }
                 },
                 trailingContent = {
                     Row(
