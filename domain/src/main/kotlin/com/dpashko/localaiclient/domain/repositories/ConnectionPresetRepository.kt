@@ -14,6 +14,11 @@ interface ConnectionPresetRepository {
     fun observeConnectionPresets(): Flow<List<ConnectionPreset>>
 
     /**
+     * Returns the current saved preset snapshot.
+     */
+    suspend fun getConnectionPresets(): AppResult<List<ConnectionPreset>>
+
+    /**
      * Saves or updates [preset] in local private storage.
      */
     suspend fun saveConnectionPreset(preset: ConnectionPreset): AppResult<Unit>

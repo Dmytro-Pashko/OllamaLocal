@@ -15,10 +15,30 @@ class SaveConnectionPresetUseCase @Inject constructor(
     /**
      * Saves [preset] when its connection fields are valid.
      */
-    suspend operator fun invoke(preset: ConnectionPreset): AppResult<Unit> =
+    suspend operator fun invoke(preset: ConnectionPreset): AppResult<Unit> {
         if (preset.name.isBlank() || preset.host.isBlank() || preset.port !in 1..65535) {
-            AppResult.Failure(AppError.InvalidConnectionConfig)
-        } else {
-            connectionPresetRepository.saveConnectionPreset(preset)
+            return AppResult.Failure(AppError.InvalidConnectionConfig)
         }
+
+        val normalizedPreset = preset.copy(
+            name = preset.name.trim(),
+            host = preset.host.trim(),
+        )
+        return when (val presetsResult = connectionPresetRepository.getConnectionPresets()) {
+            is AppResult.Failure -> presetsResult
+            is AppResult.Success -> {
+                val hasDuplicate = presetsResult.data.any { savedPreset ->
+                    savedPreset.id != normalizedPreset.id &&
+                        savedPreset.provider == normalizedPreset.provider &&
+                        savedPreset.host.trim().equals(normalizedPreset.host, ignoreCase = true) &&
+                        savedPreset.port == normalizedPreset.port
+                }
+                if (hasDuplicate) {
+                    AppResult.Failure(AppError.DuplicateConnectionPreset)
+                } else {
+                    connectionPresetRepository.saveConnectionPreset(normalizedPreset)
+                }
+            }
+        }
+    }
 }

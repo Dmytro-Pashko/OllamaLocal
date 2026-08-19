@@ -254,6 +254,7 @@ class GenerateAssistantMessageWorker @AssistedInject constructor(
             AppError.EmptyMessage -> "Message is empty."
             AppError.EmptyModels -> "No local models found."
             AppError.InvalidConnectionConfig -> "Invalid connection config."
+            AppError.DuplicateConnectionPreset -> "Duplicate connection preset."
             AppError.InvalidGenerationSettings -> "Invalid generation settings."
             AppError.InvalidConversationTitle -> "Invalid conversation title."
             AppError.NetworkUnavailable -> "Provider is not reachable."

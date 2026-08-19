@@ -19,6 +19,9 @@ sealed interface AppError {
     /** Conversation title is blank or too long. */
     data object InvalidConversationTitle : AppError
 
+    /** A saved server already exists for this provider, host, and port. */
+    data object DuplicateConnectionPreset : AppError
+
     /** Local provider could not be reached over the network. */
     data object NetworkUnavailable : AppError
 

@@ -27,6 +27,15 @@ class ConnectionPresetRepositoryImpl @Inject constructor(
     override fun observeConnectionPresets(): Flow<List<ConnectionPreset>> =
         presetsState.asStateFlow()
 
+    override suspend fun getConnectionPresets(): AppResult<List<ConnectionPreset>> =
+        try {
+            AppResult.Success(presetsState.value)
+        } catch (exception: CancellationException) {
+            throw exception
+        } catch (exception: Exception) {
+            AppResult.Failure(AppError.Unknown(exception.message))
+        }
+
     override suspend fun saveConnectionPreset(preset: ConnectionPreset): AppResult<Unit> =
         safePreferencesCall {
             val existingPresets = presetsState.value
