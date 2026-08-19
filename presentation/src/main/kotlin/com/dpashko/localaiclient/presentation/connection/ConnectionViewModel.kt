@@ -10,11 +10,8 @@ import com.dpashko.localaiclient.domain.models.connection.LastConnection
 import com.dpashko.localaiclient.domain.models.connection.ProviderDiagnostics
 import com.dpashko.localaiclient.domain.models.connection.ProviderHealth
 import com.dpashko.localaiclient.domain.models.error.AppError
-import com.dpashko.localaiclient.domain.usecases.ApplyConnectionPresetUseCase
 import com.dpashko.localaiclient.domain.usecases.ConnectToProviderUseCase
-import com.dpashko.localaiclient.domain.usecases.DeleteConnectionPresetUseCase
 import com.dpashko.localaiclient.domain.usecases.GetAvailableModelsUseCase
-import com.dpashko.localaiclient.domain.usecases.ObserveConnectionPresetsUseCase
 import com.dpashko.localaiclient.domain.usecases.ObserveLastConnectionUseCase
 import com.dpashko.localaiclient.domain.usecases.SaveConnectionPresetUseCase
 import com.dpashko.localaiclient.domain.usecases.SaveLastConnectionUseCase
@@ -23,7 +20,10 @@ import com.dpashko.localaiclient.presentation.common.toUserMessage
 import com.dpashko.localaiclient.presentation.ui.models.toUi
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
@@ -37,24 +37,18 @@ import javax.inject.Inject
 class ConnectionViewModel @Inject constructor(
     private val connectToProviderUseCase: ConnectToProviderUseCase,
     private val getAvailableModelsUseCase: GetAvailableModelsUseCase,
-    private val observeConnectionPresetsUseCase: ObserveConnectionPresetsUseCase,
     private val observeLastConnectionUseCase: ObserveLastConnectionUseCase,
     private val saveConnectionPresetUseCase: SaveConnectionPresetUseCase,
     private val saveLastConnectionUseCase: SaveLastConnectionUseCase,
     private val saveProviderDiagnosticsUseCase: SaveProviderDiagnosticsUseCase,
-    private val deleteConnectionPresetUseCase: DeleteConnectionPresetUseCase,
-    private val applyConnectionPresetUseCase: ApplyConnectionPresetUseCase,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(ConnectionUiState())
     val uiState: StateFlow<ConnectionUiState> = _uiState.asStateFlow()
 
-    init {
-        viewModelScope.launch {
-            observeConnectionPresetsUseCase().collect { presets ->
-                _uiState.update { it.copy(presets = presets) }
-            }
-        }
+    private val _events = MutableSharedFlow<ConnectionEvent>()
+    val events: SharedFlow<ConnectionEvent> = _events.asSharedFlow()
 
+    init {
         viewModelScope.launch {
             observeLastConnectionUseCase().first()?.let { connection ->
                 _uiState.update {
@@ -63,7 +57,6 @@ class ConnectionViewModel @Inject constructor(
                         host = connection.host,
                         port = connection.port.toString(),
                         selectedModelName = connection.modelName,
-                        selectedPresetId = null,
                         isConnected = false,
                         isRefreshingModels = false,
                         models = emptyList(),
@@ -81,7 +74,6 @@ class ConnectionViewModel @Inject constructor(
         _uiState.update {
             it.copy(
                 port = port.filter(Char::isDigit),
-                selectedPresetId = null,
                 isConnected = false,
                 isRefreshingModels = false,
                 providerHealth = ProviderHealth.NOT_CHECKED,
@@ -100,7 +92,6 @@ class ConnectionViewModel @Inject constructor(
             it.copy(
                 provider = provider,
                 port = provider.defaultPort.toString(),
-                selectedPresetId = null,
                 isConnected = false,
                 isRefreshingModels = false,
                 providerHealth = ProviderHealth.NOT_CHECKED,
@@ -118,7 +109,6 @@ class ConnectionViewModel @Inject constructor(
         _uiState.update {
             it.copy(
                 host = host,
-                selectedPresetId = null,
                 isConnected = false,
                 isRefreshingModels = false,
                 providerHealth = ProviderHealth.NOT_CHECKED,
@@ -137,54 +127,24 @@ class ConnectionViewModel @Inject constructor(
     }
 
     /**
-     * Applies a saved preset to the editable connection fields.
-     */
-    fun applyPreset(presetId: String) {
-        val preset = _uiState.value.presets.firstOrNull { it.id == presetId } ?: return
-        when (val result = applyConnectionPresetUseCase(preset)) {
-            is AppResult.Failure -> {
-                _uiState.update { it.copy(errorMessage = result.error.toUserMessage()) }
-            }
-
-            is AppResult.Success -> {
-                val appliedPreset = result.data
-                _uiState.update {
-                    it.copy(
-                        provider = appliedPreset.provider,
-                        host = appliedPreset.host,
-                        port = appliedPreset.port.toString(),
-                        selectedModelName = appliedPreset.modelName,
-                        selectedPresetId = appliedPreset.id,
-                        isConnected = false,
-                        isRefreshingModels = false,
-                        providerHealth = ProviderHealth.NOT_CHECKED,
-                        models = emptyList(),
-                        errorMessage = null,
-                    )
-                }
-            }
-        }
-    }
-
-    /**
      * Saves current connection input as a local preset.
      */
     fun saveCurrentAsPreset(name: String) {
         val state = _uiState.value
         val port = state.port.toIntOrNull()
-        if (name.isBlank() || state.host.isBlank() || port == null) {
+        val modelName = state.selectedModelName
+        if (!state.canSavePreset || name.isBlank() || port == null || modelName == null) {
             _uiState.update { it.copy(errorMessage = AppError.InvalidConnectionConfig.toUserMessage()) }
             return
         }
 
-        val presetId = state.selectedPresetId ?: "preset-${System.currentTimeMillis()}"
         val preset = ConnectionPreset(
-            id = presetId,
+            id = "preset-${System.currentTimeMillis()}",
             name = name.trim(),
             provider = state.provider,
             host = state.host.trim(),
             port = port,
-            modelName = state.selectedModelName,
+            modelName = modelName,
             updatedAtMillis = System.currentTimeMillis(),
         )
 
@@ -196,33 +156,9 @@ class ConnectionViewModel @Inject constructor(
 
                 is AppResult.Success -> {
                     _uiState.update {
-                        it.copy(
-                            selectedPresetId = preset.id,
-                            errorMessage = null,
-                        )
+                        it.copy(errorMessage = null)
                     }
-                }
-            }
-        }
-    }
-
-    /**
-     * Deletes a saved preset from local storage.
-     */
-    fun deletePreset(presetId: String) {
-        viewModelScope.launch {
-            when (val result = deleteConnectionPresetUseCase(presetId)) {
-                is AppResult.Failure -> {
-                    _uiState.update { it.copy(errorMessage = result.error.toUserMessage()) }
-                }
-
-                is AppResult.Success -> {
-                    _uiState.update {
-                        it.copy(
-                            selectedPresetId = it.selectedPresetId?.takeIf { id -> id != presetId },
-                            errorMessage = null,
-                        )
-                    }
+                    _events.emit(ConnectionEvent.PresetSaved)
                 }
             }
         }
@@ -410,4 +346,8 @@ class ConnectionViewModel @Inject constructor(
             ),
         )
     }
+}
+
+sealed interface ConnectionEvent {
+    data object PresetSaved : ConnectionEvent
 }
