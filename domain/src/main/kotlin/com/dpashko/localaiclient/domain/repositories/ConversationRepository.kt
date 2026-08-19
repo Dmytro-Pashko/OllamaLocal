@@ -20,6 +20,14 @@ interface ConversationRepository {
     fun observeConversations(query: String): Flow<List<Conversation>>
 
     /**
+     * Observes active or archived conversations filtered by local title, model, or message text.
+     */
+    fun observeConversations(
+        query: String,
+        isArchived: Boolean,
+    ): Flow<List<Conversation>>
+
+    /**
      * Observes all messages that belong to [conversationId].
      */
     fun observeMessages(conversationId: Long): Flow<List<Message>>
@@ -60,6 +68,14 @@ interface ConversationRepository {
     suspend fun setConversationPinned(
         conversationId: Long,
         isPinned: Boolean,
+    ): AppResult<Unit>
+
+    /**
+     * Moves a conversation between the active list and archive.
+     */
+    suspend fun setConversationArchived(
+        conversationId: Long,
+        isArchived: Boolean,
     ): AppResult<Unit>
 
     /**

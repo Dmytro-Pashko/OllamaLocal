@@ -10,6 +10,10 @@ data class ConversationListItemEntity(
     val title: String,
     /** True when the conversation should be shown above regular conversations. */
     val isPinned: Boolean,
+    /** True when this conversation is hidden from the active list. */
+    val isArchived: Boolean,
+    /** Time when this conversation was archived, or null when active. */
+    val archivedAtMillis: Long?,
     /** Model selected for this conversation. */
     val modelName: String,
     /** Creation timestamp in epoch milliseconds. */

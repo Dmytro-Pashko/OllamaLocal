@@ -10,6 +10,10 @@ data class Conversation(
     val title: String,
     /** Whether this conversation should be shown above regular conversations. */
     val isPinned: Boolean,
+    /** Whether this conversation is hidden from the active conversation list. */
+    val isArchived: Boolean,
+    /** Time when this conversation was archived, or null when active. */
+    val archivedAtMillis: Long?,
     /** Model selected when the conversation was created. */
     val modelName: String,
     /** Creation timestamp in epoch milliseconds. */

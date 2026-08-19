@@ -44,12 +44,18 @@ import kotlinx.coroutines.flow.collectLatest
 
 @Composable
 fun ConversationListRoute(
+    modifier: Modifier = Modifier,
     viewModel: ConversationListViewModel,
+    isArchive: Boolean = false,
     onOpenSettings: () -> Unit,
     onDisconnect: () -> Unit,
     onOpenConversation: (AiProvider, String, Int, String, Long) -> Unit,
 ) {
     val state by viewModel.uiState.collectAsState()
+
+    LaunchedEffect(isArchive) {
+        viewModel.setArchiveFilter(isArchive)
+    }
 
     LaunchedEffect(viewModel) {
         viewModel.events.collectLatest { event ->
@@ -70,6 +76,7 @@ fun ConversationListRoute(
     }
 
     ConversationListScreen(
+        modifier = modifier,
         state = state,
         onOpenSettings = onOpenSettings,
         onDisconnect = viewModel::disconnect,
@@ -78,6 +85,7 @@ fun ConversationListRoute(
         onDeleteConversation = viewModel::deleteConversation,
         onRenameConversation = viewModel::renameConversation,
         onSetConversationPinned = viewModel::setConversationPinned,
+        onSetConversationArchived = viewModel::setConversationArchived,
         onOpenConversation = { conversation ->
             onOpenConversation(
                 state.provider,
@@ -93,6 +101,7 @@ fun ConversationListRoute(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ConversationListScreen(
+    modifier: Modifier = Modifier,
     state: ConversationListUiState,
     onOpenSettings: () -> Unit,
     onDisconnect: () -> Unit,
@@ -101,6 +110,7 @@ private fun ConversationListScreen(
     onDeleteConversation: (Long) -> Unit,
     onRenameConversation: (Long, String) -> Unit,
     onSetConversationPinned: (Long, Boolean) -> Unit,
+    onSetConversationArchived: (Long, Boolean) -> Unit,
     onOpenConversation: (ConversationUi) -> Unit,
 ) {
     var pendingDeleteConversation by remember { mutableStateOf<ConversationUi?>(null) }
@@ -164,9 +174,18 @@ private fun ConversationListScreen(
     }
 
     Scaffold(
+        modifier = modifier,
         topBar = {
             TopAppBar(
-                title = { Text("${state.provider.displayName} (${state.host})") },
+                title = {
+                    Text(
+                        if (state.isArchive) {
+                            "Archive"
+                        } else {
+                            "${state.provider.displayName} (${state.host})"
+                        },
+                    )
+                },
                 actions = {
                     TextButton(
                         onClick = onOpenSettings,
@@ -184,8 +203,10 @@ private fun ConversationListScreen(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = onCreateConversation) {
-                Text("+")
+            if (!state.isArchive) {
+                FloatingActionButton(onClick = onCreateConversation) {
+                    Text("+")
+                }
             }
         },
     ) { innerPadding ->
@@ -216,13 +237,13 @@ private fun ConversationListScreen(
                     ) {
                         Text(
                             text = if (state.searchQuery.isBlank()) {
-                                "No conversations yet"
+                                if (state.isArchive) "No archived conversations" else "No conversations yet"
                             } else {
                                 "No matching conversations"
                             },
                             style = MaterialTheme.typography.titleMedium,
                         )
-                        if (state.searchQuery.isBlank()) {
+                        if (state.searchQuery.isBlank() && !state.isArchive) {
                             Text(
                                 text = "Tap + to start with ${state.selectedModelName}.",
                                 style = MaterialTheme.typography.bodyMedium,
@@ -244,9 +265,12 @@ private fun ConversationListScreen(
                                 },
                                 onTogglePinned = {
                                     onSetConversationPinned(conversation.id, !conversation.isPinned)
-                            },
-                            onOpen = { onOpenConversation(conversation) },
-                        )
+                                },
+                                onToggleArchived = {
+                                    onSetConversationArchived(conversation.id, !conversation.isArchived)
+                                },
+                                onOpen = { onOpenConversation(conversation) },
+                            )
                         }
                     }
                 }
@@ -272,6 +296,7 @@ private fun SwipeConversationItem(
     onDeleteRequest: () -> Unit,
     onRenameRequest: () -> Unit,
     onTogglePinned: () -> Unit,
+    onToggleArchived: () -> Unit,
     onOpen: () -> Unit,
 ) {
     val dismissState = rememberSwipeToDismissBoxState(
@@ -322,6 +347,9 @@ private fun SwipeConversationItem(
                         }
                         TextButton(onClick = onRenameRequest) {
                             Text("Rename")
+                        }
+                        TextButton(onClick = onToggleArchived) {
+                            Text(if (conversation.isArchived) "Unarchive" else "Archive")
                         }
                         if (conversation.hasGeneratingMessage) {
                             CircularProgressIndicator(modifier = Modifier.size(24.dp))

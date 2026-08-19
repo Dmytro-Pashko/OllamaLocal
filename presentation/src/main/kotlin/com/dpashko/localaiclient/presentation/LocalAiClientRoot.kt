@@ -1,7 +1,17 @@
 package com.dpashko.localaiclient.presentation
 
 import android.net.Uri
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -37,7 +47,7 @@ private fun LocalAiClientNavHost() {
             ConnectionRoute(
                 viewModel = hiltViewModel(),
                 onOpenConversations = { provider, host, port, modelName ->
-                    navController.navigate(Routes.conversationList(provider, host, port, modelName)) {
+                    navController.navigate(Routes.connected(provider, host, port, modelName)) {
                         popUpTo(Routes.Connection) {
                             inclusive = true
                         }
@@ -47,7 +57,7 @@ private fun LocalAiClientNavHost() {
         }
 
         composable(
-            route = Routes.ConversationList,
+            route = Routes.Connected,
             arguments = listOf(
                 navArgument(Routes.ArgProvider) { type = NavType.StringType },
                 navArgument(Routes.ArgHost) { type = NavType.StringType },
@@ -55,16 +65,11 @@ private fun LocalAiClientNavHost() {
                 navArgument(Routes.ArgModelName) { type = NavType.StringType },
             ),
         ) {
-            ConversationListRoute(
-                viewModel = hiltViewModel(),
-                onOpenSettings = {
-                    navController.navigate(Routes.Settings)
-                },
+            ConnectedShell(
+                onOpenSettings = { navController.navigate(Routes.Settings) },
                 onDisconnect = {
                     navController.navigate(Routes.Connection) {
-                        popUpTo(Routes.ConversationList) {
-                            inclusive = true
-                        }
+                        popUpTo(Routes.Connected) { inclusive = true }
                         launchSingleTop = true
                     }
                 },
@@ -107,6 +112,72 @@ private fun LocalAiClientNavHost() {
     }
 }
 
+@Composable
+private fun ConnectedShell(
+    onOpenSettings: () -> Unit,
+    onDisconnect: () -> Unit,
+    onOpenConversation: (AiProvider, String, Int, String, Long) -> Unit,
+) {
+    var selectedTab by remember { mutableStateOf(ConnectedTab.CONVERSATIONS) }
+
+    Scaffold(
+        bottomBar = {
+            NavigationBar {
+                ConnectedTab.entries.forEach { tab ->
+                    NavigationBarItem(
+                        selected = selectedTab == tab,
+                        onClick = { selectedTab = tab },
+                        icon = {},
+                        label = { Text(tab.label) },
+                    )
+                }
+            }
+        },
+    ) { innerPadding ->
+        when (selectedTab) {
+            ConnectedTab.CONVERSATIONS -> ConversationListRoute(
+                modifier = Modifier.padding(innerPadding),
+                viewModel = hiltViewModel(),
+                isArchive = false,
+                onOpenSettings = onOpenSettings,
+                onDisconnect = onDisconnect,
+                onOpenConversation = onOpenConversation,
+            )
+
+            ConnectedTab.ARCHIVE -> ConversationListRoute(
+                modifier = Modifier.padding(innerPadding),
+                viewModel = hiltViewModel(),
+                isArchive = true,
+                onOpenSettings = onOpenSettings,
+                onDisconnect = onDisconnect,
+                onOpenConversation = onOpenConversation,
+            )
+
+            ConnectedTab.DASHBOARD -> DashboardPlaceholder(
+                modifier = Modifier.padding(innerPadding),
+            )
+        }
+    }
+}
+
+@Composable
+private fun DashboardPlaceholder(modifier: Modifier = Modifier) {
+    Scaffold(modifier = modifier) { innerPadding ->
+        Text(
+            modifier = Modifier.padding(innerPadding),
+            text = "Dashboard",
+        )
+    }
+}
+
+private enum class ConnectedTab(
+    val label: String,
+) {
+    CONVERSATIONS("Conversations"),
+    ARCHIVE("Archive"),
+    DASHBOARD("Dashboard"),
+}
+
 /**
  * Compose Navigation route definitions and route builders.
  */
@@ -126,18 +197,18 @@ object Routes {
 
     /** Settings screen route. */
     const val Settings = "settings"
-    /** Conversation list route including provider connection arguments. */
-    const val ConversationList = "conversations/{$ArgProvider}/{$ArgHost}/{$ArgPort}/{$ArgModelName}"
+    /** Connected app shell route including provider connection arguments. */
+    const val Connected = "connected/{$ArgProvider}/{$ArgHost}/{$ArgPort}/{$ArgModelName}"
     /** Chat route including provider connection and conversation arguments. */
     const val Conversation = "conversation/{$ArgProvider}/{$ArgHost}/{$ArgPort}/{$ArgModelName}/{$ArgConversationId}"
 
-    /** Builds a conversation list route from provider connection details. */
-    fun conversationList(
+    /** Builds a connected app shell route from provider connection details. */
+    fun connected(
         provider: AiProvider,
         host: String,
         port: Int,
         modelName: String,
-    ): String = "conversations/${provider.routeValue}/${Uri.encode(host)}/$port/${Uri.encode(modelName)}"
+    ): String = "connected/${provider.routeValue}/${Uri.encode(host)}/$port/${Uri.encode(modelName)}"
 
     /** Builds a chat route for the selected conversation. */
     fun conversation(

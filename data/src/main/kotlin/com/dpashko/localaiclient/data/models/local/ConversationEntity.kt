@@ -17,6 +17,10 @@ data class ConversationEntity(
     val isPinned: Boolean = false,
     /** True when the title was edited by the user and should not be auto-generated. */
     val isTitleManuallyEdited: Boolean = false,
+    /** True when this conversation is hidden from the active list. */
+    val isArchived: Boolean = false,
+    /** Time when this conversation was archived, or null when active. */
+    val archivedAtMillis: Long? = null,
     /** Model selected for this conversation. */
     val modelName: String,
     /** Creation timestamp in epoch milliseconds. */

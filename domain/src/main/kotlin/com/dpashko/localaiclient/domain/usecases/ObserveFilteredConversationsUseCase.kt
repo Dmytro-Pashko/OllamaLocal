@@ -12,5 +12,11 @@ class ObserveFilteredConversationsUseCase @Inject constructor(
     /**
      * Emits all conversations for blank [query], otherwise matching conversations only.
      */
-    operator fun invoke(query: String) = conversationRepository.observeConversations(query)
+    operator fun invoke(
+        query: String,
+        isArchived: Boolean = false,
+    ) = conversationRepository.observeConversations(
+        query = query,
+        isArchived = isArchived,
+    )
 }

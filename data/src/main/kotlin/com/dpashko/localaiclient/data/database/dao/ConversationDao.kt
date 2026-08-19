@@ -23,6 +23,8 @@ interface ConversationDao {
             conversations.id,
             conversations.title,
             conversations.isPinned,
+            conversations.isArchived,
+            conversations.archivedAtMillis,
             conversations.modelName,
             conversations.createdAtMillis,
             conversations.updatedAtMillis,
@@ -33,6 +35,7 @@ interface ConversationDao {
                     AND messages.status = 'GENERATING'
             ) AS hasGeneratingMessage
         FROM conversations
+        WHERE conversations.isArchived = 0
         ORDER BY conversations.isPinned DESC, conversations.updatedAtMillis DESC
         """,
     )
@@ -47,6 +50,8 @@ interface ConversationDao {
             conversations.id,
             conversations.title,
             conversations.isPinned,
+            conversations.isArchived,
+            conversations.archivedAtMillis,
             conversations.modelName,
             conversations.createdAtMillis,
             conversations.updatedAtMillis,
@@ -57,18 +62,24 @@ interface ConversationDao {
                     AND messages.status = 'GENERATING'
             ) AS hasGeneratingMessage
         FROM conversations
-        WHERE :query = ''
-            OR conversations.title LIKE '%' || :query || '%'
-            OR conversations.modelName LIKE '%' || :query || '%'
-            OR EXISTS(
-                SELECT 1 FROM messages
-                WHERE messages.conversationId = conversations.id
-                    AND messages.content LIKE '%' || :query || '%'
+        WHERE conversations.isArchived = :isArchived
+            AND (
+                :query = ''
+                OR conversations.title LIKE '%' || :query || '%'
+                OR conversations.modelName LIKE '%' || :query || '%'
+                OR EXISTS(
+                    SELECT 1 FROM messages
+                    WHERE messages.conversationId = conversations.id
+                        AND messages.content LIKE '%' || :query || '%'
+                )
             )
         ORDER BY conversations.isPinned DESC, conversations.updatedAtMillis DESC
         """,
     )
-    fun observeConversations(query: String): Flow<List<ConversationListItemEntity>>
+    fun observeConversations(
+        query: String,
+        isArchived: Boolean,
+    ): Flow<List<ConversationListItemEntity>>
 
     /**
      * Observes all messages for [conversationId] in chronological order.
@@ -221,6 +232,25 @@ interface ConversationDao {
     suspend fun updateConversationPinned(
         conversationId: Long,
         isPinned: Boolean,
+    ): Int
+
+    /**
+     * Moves a conversation between the active and archived lists.
+     */
+    @Query(
+        """
+        UPDATE conversations
+        SET isArchived = :isArchived,
+            archivedAtMillis = :archivedAtMillis,
+            updatedAtMillis = :updatedAtMillis
+        WHERE id = :conversationId
+        """,
+    )
+    suspend fun updateConversationArchived(
+        conversationId: Long,
+        isArchived: Boolean,
+        archivedAtMillis: Long?,
+        updatedAtMillis: Long,
     ): Int
 
     /**

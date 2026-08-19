@@ -26,7 +26,16 @@ class ConversationRepositoryImpl @Inject constructor(
             .map { conversations -> conversations.map { it.toDomain() } }
 
     override fun observeConversations(query: String): Flow<List<Conversation>> =
-        conversationDao.observeConversations(query.trim())
+        observeConversations(query = query, isArchived = false)
+
+    override fun observeConversations(
+        query: String,
+        isArchived: Boolean,
+    ): Flow<List<Conversation>> =
+        conversationDao.observeConversations(
+            query = query.trim(),
+            isArchived = isArchived,
+        )
             .map { conversations -> conversations.map { it.toDomain() } }
 
     override fun observeMessages(conversationId: Long): Flow<List<Message>> =
@@ -54,6 +63,8 @@ class ConversationRepositoryImpl @Inject constructor(
                     title = "New conversation",
                     isPinned = false,
                     isTitleManuallyEdited = false,
+                    isArchived = false,
+                    archivedAtMillis = null,
                     modelName = modelName,
                     createdAtMillis = now,
                     updatedAtMillis = now,
@@ -85,6 +96,23 @@ class ConversationRepositoryImpl @Inject constructor(
             )
             if (updatedRows == 0) {
                 throw IllegalStateException("Conversation cannot be updated.")
+            }
+        }
+
+    override suspend fun setConversationArchived(
+        conversationId: Long,
+        isArchived: Boolean,
+    ): AppResult<Unit> =
+        safeDatabaseCall {
+            val now = System.currentTimeMillis()
+            val updatedRows = conversationDao.updateConversationArchived(
+                conversationId = conversationId,
+                isArchived = isArchived,
+                archivedAtMillis = if (isArchived) now else null,
+                updatedAtMillis = now,
+            )
+            if (updatedRows == 0) {
+                throw IllegalStateException("Conversation cannot be archived.")
             }
         }
 

@@ -17,6 +17,8 @@ data class ConversationListUiState(
     val selectedModelName: String = "",
     /** Conversations currently available on device. */
     val conversations: List<ConversationUi> = emptyList(),
+    /** True when the screen is showing archived conversations. */
+    val isArchive: Boolean = false,
     /** Current local conversation search query. */
     val searchQuery: String = "",
     /** True while disconnect is stopping all active generation work. */

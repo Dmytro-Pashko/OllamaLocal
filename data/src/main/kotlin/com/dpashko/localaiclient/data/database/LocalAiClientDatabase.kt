@@ -16,7 +16,7 @@ import com.dpashko.localaiclient.data.models.local.MessageEntity
         ConversationEntity::class,
         MessageEntity::class,
     ],
-    version = 4,
+    version = 5,
     exportSchema = false,
 )
 abstract class LocalAiClientDatabase : RoomDatabase() {
@@ -53,6 +53,16 @@ abstract class LocalAiClientDatabase : RoomDatabase() {
                 db.execSQL(
                     "ALTER TABLE conversations ADD COLUMN isTitleManuallyEdited INTEGER NOT NULL DEFAULT 0",
                 )
+            }
+        }
+
+        /**
+         * Adds archive metadata for hiding conversations without deleting local history.
+         */
+        val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE conversations ADD COLUMN isArchived INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE conversations ADD COLUMN archivedAtMillis INTEGER")
             }
         }
     }

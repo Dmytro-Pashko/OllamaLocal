@@ -13,6 +13,8 @@ data class ConversationUi(
     val title: String,
     /** True when this conversation is pinned in the list. */
     val isPinned: Boolean,
+    /** True when this conversation is shown in the archive. */
+    val isArchived: Boolean,
     /** Model name shown as secondary context. */
     val modelName: String,
     /** Formatted last-updated text. */
@@ -29,6 +31,7 @@ fun Conversation.toUi(): ConversationUi =
         id = id,
         title = title,
         isPinned = isPinned,
+        isArchived = isArchived,
         modelName = modelName,
         updatedAtText = updatedAtMillis.toConversationTimeText(),
         hasGeneratingMessage = hasGeneratingMessage,

@@ -10,6 +10,7 @@ import com.dpashko.localaiclient.domain.usecases.CreateConversationUseCase
 import com.dpashko.localaiclient.domain.usecases.DeleteConversationUseCase
 import com.dpashko.localaiclient.domain.usecases.ObserveFilteredConversationsUseCase
 import com.dpashko.localaiclient.domain.usecases.RenameConversationUseCase
+import com.dpashko.localaiclient.domain.usecases.SetConversationArchivedUseCase
 import com.dpashko.localaiclient.domain.usecases.SetConversationPinnedUseCase
 import com.dpashko.localaiclient.domain.usecases.StopAllGenerationsUseCase
 import com.dpashko.localaiclient.presentation.Routes
@@ -38,6 +39,7 @@ class ConversationListViewModel @Inject constructor(
     private val deleteConversationUseCase: DeleteConversationUseCase,
     private val renameConversationUseCase: RenameConversationUseCase,
     private val setConversationPinnedUseCase: SetConversationPinnedUseCase,
+    private val setConversationArchivedUseCase: SetConversationArchivedUseCase,
     private val stopAllGenerationsUseCase: StopAllGenerationsUseCase,
 ) : ViewModel() {
     private val provider = AiProvider.fromRouteValue(savedStateHandle[Routes.ArgProvider])
@@ -73,14 +75,43 @@ class ConversationListViewModel @Inject constructor(
                 errorMessage = null,
             )
         }
-        observeConversations(query)
+        observeConversations(
+            query = query,
+            isArchived = _uiState.value.isArchive,
+        )
     }
 
-    private fun observeConversations(query: String) {
+    /**
+     * Switches between active and archived local conversations.
+     */
+    fun setArchiveFilter(isArchive: Boolean) {
+        if (_uiState.value.isArchive == isArchive) {
+            return
+        }
+
+        _uiState.update {
+            it.copy(
+                isArchive = isArchive,
+                errorMessage = null,
+            )
+        }
+        observeConversations(
+            query = _uiState.value.searchQuery,
+            isArchived = isArchive,
+        )
+    }
+
+    private fun observeConversations(
+        query: String,
+        isArchived: Boolean = _uiState.value.isArchive,
+    ) {
         observeConversationsJob?.cancel()
         // The list is fully driven by local storage so generation updates survive navigation.
         observeConversationsJob = viewModelScope.launch {
-            observeFilteredConversationsUseCase(query).collect { conversations ->
+            observeFilteredConversationsUseCase(
+                query = query,
+                isArchived = isArchived,
+            ).collect { conversations ->
                 _uiState.update {
                     it.copy(conversations = conversations.map { conversation -> conversation.toUi() })
                 }
@@ -140,6 +171,26 @@ class ConversationListViewModel @Inject constructor(
     ) {
         viewModelScope.launch {
             when (val result = setConversationPinnedUseCase(conversationId, isPinned)) {
+                is AppResult.Failure -> {
+                    _uiState.update { it.copy(errorMessage = result.error.toUserMessage()) }
+                }
+
+                is AppResult.Success -> {
+                    _uiState.update { it.copy(errorMessage = null) }
+                }
+            }
+        }
+    }
+
+    /**
+     * Archives or restores a conversation without deleting its local messages.
+     */
+    fun setConversationArchived(
+        conversationId: Long,
+        isArchived: Boolean,
+    ) {
+        viewModelScope.launch {
+            when (val result = setConversationArchivedUseCase(conversationId, isArchived)) {
                 is AppResult.Failure -> {
                     _uiState.update { it.copy(errorMessage = result.error.toUserMessage()) }
                 }
