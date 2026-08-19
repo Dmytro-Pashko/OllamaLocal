@@ -103,6 +103,20 @@ interface ConversationDao {
     suspend fun getMessage(messageId: Long): MessageEntity?
 
     /**
+     * Returns the newest assistant message in one conversation.
+     */
+    @Query(
+        """
+        SELECT * FROM messages
+        WHERE conversationId = :conversationId
+            AND role = 'ASSISTANT'
+        ORDER BY createdAtMillis DESC, id DESC
+        LIMIT 1
+        """,
+    )
+    suspend fun getLatestAssistantMessage(conversationId: Long): MessageEntity?
+
+    /**
      * Observes editable generation settings for one conversation.
      */
     @Query(
@@ -454,6 +468,22 @@ interface ConversationDao {
         """,
     )
     suspend fun retryAssistantMessage(messageId: Long): Int
+
+    /**
+     * Resets a completed, failed, or canceled assistant message for a full regeneration.
+     */
+    @Query(
+        """
+        UPDATE messages
+        SET content = '',
+            status = 'GENERATING',
+            errorMessage = NULL
+        WHERE id = :messageId
+            AND role = 'ASSISTANT'
+            AND status != 'GENERATING'
+        """,
+    )
+    suspend fun regenerateAssistantMessage(messageId: Long): Int
 
     /**
      * Updates a user message and returns the affected row count.

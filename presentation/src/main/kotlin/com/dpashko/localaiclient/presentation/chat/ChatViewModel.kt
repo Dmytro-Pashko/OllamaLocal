@@ -13,6 +13,7 @@ import com.dpashko.localaiclient.domain.usecases.EstimateConversationContextUseC
 import com.dpashko.localaiclient.domain.usecases.ObserveConversationSettingsUseCase
 import com.dpashko.localaiclient.domain.usecases.ObserveHasGeneratingMessageUseCase
 import com.dpashko.localaiclient.domain.usecases.ObserveMessagesUseCase
+import com.dpashko.localaiclient.domain.usecases.RegenerateLastAssistantResponseUseCase
 import com.dpashko.localaiclient.domain.usecases.RetryGenerationUseCase
 import com.dpashko.localaiclient.domain.usecases.SaveConversationSettingsUseCase
 import com.dpashko.localaiclient.domain.usecases.SendMessageUseCase
@@ -40,6 +41,7 @@ class ChatViewModel @Inject constructor(
     private val estimateConversationContextUseCase: EstimateConversationContextUseCase,
     private val sendMessageUseCase: SendMessageUseCase,
     private val retryGenerationUseCase: RetryGenerationUseCase,
+    private val regenerateLastAssistantResponseUseCase: RegenerateLastAssistantResponseUseCase,
     private val editMessageAndRegenerateUseCase: EditMessageAndRegenerateUseCase,
     private val stopGenerationUseCase: StopGenerationUseCase,
     private val saveConversationSettingsUseCase: SaveConversationSettingsUseCase,
@@ -362,6 +364,53 @@ class ChatViewModel @Inject constructor(
                 conversationId = conversationId,
                 modelName = modelName,
                 assistantMessageId = assistantMessageId,
+            )
+
+            when (result) {
+                is AppResult.Failure -> {
+                    _uiState.update {
+                        it.copy(
+                            isSending = false,
+                            errorMessage = result.error.toUserMessage(),
+                        )
+                    }
+                }
+
+                is AppResult.Success -> {
+                    _uiState.update {
+                        it.copy(
+                            isSending = false,
+                            errorMessage = null,
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Regenerates the newest assistant response in this conversation.
+     */
+    fun regenerateLastAssistantResponse() {
+        if (_uiState.value.isSending || _uiState.value.hasGeneratingMessage) {
+            return
+        }
+
+        viewModelScope.launch {
+            _uiState.update {
+                it.copy(
+                    isSending = true,
+                    errorMessage = null,
+                )
+            }
+
+            val result = regenerateLastAssistantResponseUseCase(
+                config = ConnectionConfig(
+                    provider = provider,
+                    host = host,
+                    port = port,
+                ),
+                conversationId = conversationId,
             )
 
             when (result) {

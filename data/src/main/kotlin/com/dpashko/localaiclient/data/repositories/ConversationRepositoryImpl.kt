@@ -326,6 +326,20 @@ class ConversationRepositoryImpl @Inject constructor(
             updateConversationTimestampForMessage(messageId)
         }
 
+    override suspend fun getLatestAssistantMessage(conversationId: Long): AppResult<Message?> =
+        safeDatabaseCall {
+            conversationDao.getLatestAssistantMessage(conversationId)?.toDomain()
+        }
+
+    override suspend fun regenerateAssistantMessage(messageId: Long): AppResult<Unit> =
+        safeDatabaseCall {
+            val updatedRows = conversationDao.regenerateAssistantMessage(messageId)
+            if (updatedRows == 0) {
+                throw IllegalStateException("Message cannot be regenerated.")
+            }
+            updateConversationTimestampForMessage(messageId)
+        }
+
     override suspend fun editUserMessageAndDeleteNewer(
         conversationId: Long,
         messageId: Long,

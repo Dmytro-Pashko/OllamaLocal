@@ -76,6 +76,7 @@ fun ChatRoute(
         onCancelEditClick = viewModel::cancelEditingMessage,
         onEditClick = { message -> viewModel.startEditingMessage(message.id, message.content) },
         onRetryClick = viewModel::retryGeneration,
+        onRegenerateLastAssistantResponse = viewModel::regenerateLastAssistantResponse,
         onStopGenerationClick = viewModel::stopGeneration,
         onSearchQueryChanged = viewModel::onChatSearchQueryChanged,
         onPreviousSearchMatch = viewModel::moveToPreviousSearchMatch,
@@ -94,6 +95,7 @@ private fun ChatScreen(
     onCancelEditClick: () -> Unit,
     onEditClick: (MessageUi) -> Unit,
     onRetryClick: (Long) -> Unit,
+    onRegenerateLastAssistantResponse: () -> Unit,
     onStopGenerationClick: () -> Unit,
     onSearchQueryChanged: (String) -> Unit,
     onPreviousSearchMatch: () -> Unit,
@@ -105,6 +107,7 @@ private fun ChatScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
     val hasGeneratingMessage = state.messages.any { it.status == MessageStatus.GENERATING }
+    val hasAssistantResponse = state.messages.any { it.role == MessageRole.ASSISTANT }
     var nowMillis by remember { mutableLongStateOf(System.currentTimeMillis()) }
     var actionMessage by remember { mutableStateOf<MessageUi?>(null) }
     var isSearchMode by remember { mutableStateOf(false) }
@@ -298,6 +301,14 @@ private fun ChatScreen(
                                     isToolbarMenuExpanded = false
                                     isSearchMode = true
                                 },
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Regenerate response") },
+                                onClick = {
+                                    isToolbarMenuExpanded = false
+                                    onRegenerateLastAssistantResponse()
+                                },
+                                enabled = hasAssistantResponse && !state.isSending && !state.hasGeneratingMessage,
                             )
                             DropdownMenuItem(
                                 text = { Text("Settings") },

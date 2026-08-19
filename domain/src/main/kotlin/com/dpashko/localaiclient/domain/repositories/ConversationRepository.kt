@@ -176,6 +176,16 @@ interface ConversationRepository {
     suspend fun retryAssistantMessage(messageId: Long): AppResult<Unit>
 
     /**
+     * Returns the latest assistant message in one conversation, if it exists.
+     */
+    suspend fun getLatestAssistantMessage(conversationId: Long): AppResult<Message?>
+
+    /**
+     * Resets an existing assistant message so it can be generated again.
+     */
+    suspend fun regenerateAssistantMessage(messageId: Long): AppResult<Unit>
+
+    /**
      * Updates a user message and removes newer messages so regeneration uses the edited context.
      */
     suspend fun editUserMessageAndDeleteNewer(
